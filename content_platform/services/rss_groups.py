@@ -1,11 +1,16 @@
-from ..database import get_connection
+from ..database import get_connection, insert_and_get_id
 from ..models import default_content_format
 
 
 def list_rss_groups():
     with get_connection() as conn:
+        platform_aggregation = (
+            "STRING_AGG(posts.platform, ', ' ORDER BY posts.platform)"
+            if conn.dialect == "postgres"
+            else "GROUP_CONCAT(posts.platform, ', ')"
+        )
         return conn.execute(
-            """
+            f"""
             SELECT
                 rss_items.id,
                 rss_items.title,
@@ -15,7 +20,7 @@ def list_rss_groups():
                 rss_feeds.name AS feed_name,
                 COUNT(posts.id) AS post_count,
                 SUM(CASE WHEN posts.status = 'Draft' THEN 1 ELSE 0 END) AS draft_count,
-                GROUP_CONCAT(posts.platform, ', ') AS platforms
+                {platform_aggregation} AS platforms
             FROM rss_items
             JOIN rss_feeds ON rss_feeds.id = rss_items.feed_id
             LEFT JOIN posts ON posts.rss_item_id = rss_items.id
@@ -67,7 +72,8 @@ def sync_rss_group_platforms(rss_item_id, selected_platforms):
         for platform in selected_platforms:
             if platform in existing_by_platform:
                 continue
-            cursor = conn.execute(
+            post_id = insert_and_get_id(
+                conn,
                 """
                 INSERT INTO posts (
                     title, content, hashtags, platform, content_format,
@@ -87,7 +93,6 @@ def sync_rss_group_platforms(rss_item_id, selected_platforms):
                     "Draft",
                 ),
             )
-            post_id = cursor.lastrowid
             conn.execute(
                 "INSERT INTO logs (post_id, level, message) VALUES (?, ?, ?)",
                 (post_id, "INFO", f"RSS article version created for {platform}."),

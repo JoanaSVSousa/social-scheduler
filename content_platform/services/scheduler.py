@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from ..database import get_connection
+from ..database import get_connection, insert_and_get_id
 
 
 def get_all_posts(filters=None):
@@ -34,7 +34,8 @@ def get_post(post_id):
 
 def create_post(post):
     with get_connection() as conn:
-        cursor = conn.execute(
+        post_id = insert_and_get_id(
+            conn,
             """
             INSERT INTO posts (title, content, hashtags, platform, content_format, rss_item_id, source_type, scheduled_at, status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -51,7 +52,6 @@ def create_post(post):
                 post.status,
             ),
         )
-        post_id = cursor.lastrowid
 
     add_log(post_id, "INFO", f"Post created with status {post.status}.")
     return post_id

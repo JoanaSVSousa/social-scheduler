@@ -1,7 +1,6 @@
 from datetime import datetime
 from html import unescape
 import hashlib
-import sqlite3
 import re
 import unicodedata
 import xml.etree.ElementTree as ET
@@ -9,7 +8,7 @@ from urllib.error import URLError
 from urllib.request import Request, urlopen
 from urllib.parse import unquote, urlparse
 
-from ..database import get_connection
+from ..database import get_connection, insert_and_get_id
 from ..models import Post, default_content_format
 from .scheduler import add_log, create_post
 
@@ -24,17 +23,17 @@ def list_feeds():
 
 def create_feed(name, url, target_platforms, default_hashtags):
     content_type = classify_content_type(url)
-    try:
-        with get_connection() as conn:
-            conn.execute(
-                """
-                INSERT INTO rss_feeds (name, url, target_platforms, default_hashtags, content_type)
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                (name, url, ",".join(target_platforms), default_hashtags, content_type),
-            )
-    except sqlite3.IntegrityError:
-        return False
+    with get_connection() as conn:
+        existing = conn.execute("SELECT id FROM rss_feeds WHERE url = ?", (url,)).fetchone()
+        if existing:
+            return False
+        conn.execute(
+            """
+            INSERT INTO rss_feeds (name, url, target_platforms, default_hashtags, content_type)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (name, url, ",".join(target_platforms), default_hashtags, content_type),
+        )
 
     return True
 
@@ -127,20 +126,20 @@ def item_exists(feed_id, guid):
 
 def remember_item(feed_id, guid, title, url, content_type, post_id):
     with get_connection() as conn:
-        cursor = conn.execute(
-            """
-            INSERT OR IGNORE INTO rss_items (feed_id, item_guid, title, url, content_type, post_id)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (feed_id, guid, title, url, content_type, post_id),
-        )
-        if cursor.lastrowid:
-            return cursor.lastrowid
         row = conn.execute(
             "SELECT id FROM rss_items WHERE feed_id = ? AND item_guid = ?",
             (feed_id, guid),
         ).fetchone()
-        return row["id"]
+        if row:
+            return row["id"]
+        return insert_and_get_id(
+            conn,
+            """
+            INSERT INTO rss_items (feed_id, item_guid, title, url, content_type, post_id)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (feed_id, guid, title, url, content_type, post_id),
+        )
 
 
 def update_item_post(rss_item_id, post_id):

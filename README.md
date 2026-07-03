@@ -1,8 +1,8 @@
 # Content Automation Platform
 
-A Python and SQLite platform for planning, scheduling, and tracking content publication across multiple channels.
+A Python platform for planning, scheduling, and tracking content publication across multiple channels.
 
-This project is designed as an automation-focused academic project that can run locally and later be deployed to PythonAnywhere.
+This project is designed as an automation-focused academic project that can run locally with SQLite and in production with Supabase/Postgres.
 
 ## Features
 
@@ -21,7 +21,8 @@ This project is designed as an automation-focused academic project that can run 
 
 - Python
 - Flask
-- SQLite
+- SQLite locally
+- Supabase/Postgres in production
 - HTML/CSS
 
 ## Run Locally
@@ -38,6 +39,18 @@ Then open:
 ```txt
 http://127.0.0.1:5000
 ```
+
+## Supabase/Postgres
+
+The app uses SQLite when `DATABASE_URL` is not set. For Render + Supabase, set `DATABASE_URL` in Render using the Supabase Postgres connection string.
+
+Use a connection string shaped like:
+
+```txt
+postgresql://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require
+```
+
+Do not commit the real value to GitHub.
 
 ## Protected RSS Area
 

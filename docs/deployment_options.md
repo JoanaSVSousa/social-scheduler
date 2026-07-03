@@ -34,7 +34,6 @@ Good fit for:
 
 Tradeoff:
 
-- requires migrating the database layer from SQLite to Postgres-compatible SQL;
 - uploads need object storage or another persistent file strategy;
 - more setup work.
 
@@ -44,8 +43,8 @@ Current project status:
 
 - Render web service files are prepared: `render.yaml` and `Procfile`.
 - Secrets must be configured in Render environment variables, not committed to GitHub.
-- Supabase/Postgres is the recommended production database, but the current code still uses SQLite.
-- Before using Supabase in production, migrate the database layer from SQLite placeholders to Postgres-compatible queries and move uploads to persistent object storage.
+- The database layer supports local SQLite and Supabase/Postgres via `DATABASE_URL`.
+- Before using media uploads heavily in production, move uploads to persistent object storage.
 
 Safe GitHub checklist:
 
@@ -71,4 +70,4 @@ Safe GitHub checklist:
 - Configure hourly RSS script.
 - Configure daily/weekly email report script.
 - Decide where uploads should live.
-- Decide whether SQLite is enough or Postgres is needed.
+- Set `DATABASE_URL` when using Supabase/Postgres.
