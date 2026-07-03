@@ -59,15 +59,63 @@ def posts():
     filtered_posts = get_all_posts(filters)
     media_by_post = get_media_for_posts([post["id"] for post in filtered_posts])
     schedules_by_post = get_schedules_for_posts([post["id"] for post in filtered_posts])
+    post_rows = _aggregate_posts_for_library(filtered_posts, media_by_post, schedules_by_post)
     return render_template(
         "posts.html",
-        posts=filtered_posts,
+        posts=post_rows,
         media_by_post=media_by_post,
         schedules_by_post=schedules_by_post,
         statuses=STATUSES,
         platforms=PLATFORMS,
         filters=filters,
     )
+
+
+def _aggregate_posts_for_library(posts, media_by_post, schedules_by_post):
+    rows = []
+    rss_groups = {}
+
+    for post in posts:
+        post_data = dict(post)
+        if not post_data.get("rss_item_id"):
+            post_data["is_rss_group"] = False
+            rows.append(post_data)
+            continue
+
+        group = rss_groups.setdefault(
+            post_data["rss_item_id"],
+            {
+                "id": post_data["id"],
+                "rss_item_id": post_data["rss_item_id"],
+                "title": post_data["title"],
+                "content": post_data["content"],
+                "platform": "",
+                "content_format": "Multiple versions",
+                "status": post_data["status"],
+                "source_type": post_data["source_type"],
+                "scheduled_at": post_data["scheduled_at"],
+                "hashtags": post_data["hashtags"],
+                "is_rss_group": True,
+                "platforms": [],
+                "statuses": [],
+                "media_total": 0,
+                "schedule_total": 0,
+            },
+        )
+        group["platforms"].append(post_data["platform"])
+        group["statuses"].append(post_data["status"])
+        group["media_total"] += len(media_by_post.get(post_data["id"], []))
+        group["schedule_total"] += len(schedules_by_post.get(post_data["id"], []))
+        if post_data["scheduled_at"] and (not group["scheduled_at"] or post_data["scheduled_at"] < group["scheduled_at"]):
+            group["scheduled_at"] = post_data["scheduled_at"]
+
+    for group in rss_groups.values():
+        group["platform"] = ", ".join(sorted(set(group["platforms"])))
+        unique_statuses = sorted(set(group["statuses"]))
+        group["status"] = unique_statuses[0] if len(unique_statuses) == 1 else "Mixed"
+        rows.append(group)
+
+    return rows
 
 
 @bp.route("/rss/articles")

@@ -319,6 +319,11 @@ tr:last-child td {
     color: var(--blue);
 }
 
+.status.mixed {
+    background: rgba(255, 79, 216, 0.14);
+    color: var(--accent);
+}
+
 .status.published,
 .log-level.success {
     background: rgba(93, 240, 167, 0.14);

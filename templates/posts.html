@@ -47,6 +47,9 @@
             <tr>
                 <td>
                     <strong>{{ post.title }}</strong>
+                    {% if post.is_rss_group %}
+                    <small>RSS article with {{ post.platforms|length }} network version{% if post.platforms|length != 1 %}s{% endif %}</small>
+                    {% endif %}
                     <small>{{ post.content[:110] }}{% if post.content|length > 110 %}...{% endif %}</small>
                 </td>
                 <td>{{ post.platform }}</td>
@@ -54,6 +57,9 @@
                 <td><span class="status {{ post.status|lower }}">{{ post.status }}</span></td>
                 <td><span class="type-pill {{ post.source_type|lower }}">{{ post.source_type }}</span></td>
                 <td>
+                    {% if post.is_rss_group %}
+                    <span class="media-count">{{ post.media_total }} file{% if post.media_total != 1 %}s{% endif %}</span>
+                    {% else %}
                     {% set media_items = media_by_post.get(post.id, []) %}
                     {% if media_items %}
                     <div class="media-strip">
@@ -67,8 +73,12 @@
                     {% else %}
                     <span class="muted">No media</span>
                     {% endif %}
+                    {% endif %}
                 </td>
                 <td>
+                    {% if post.is_rss_group %}
+                    <span class="media-count">{{ post.schedule_total }} date{% if post.schedule_total != 1 %}s{% endif %}</span>
+                    {% else %}
                     {% set schedule_items = schedules_by_post.get(post.id, []) %}
                     {% if schedule_items %}
                     <div class="media-strip">
@@ -82,18 +92,20 @@
                     {% else %}
                     <span class="muted">No recycling</span>
                     {% endif %}
+                    {% endif %}
                 </td>
                 <td>{{ post.scheduled_at or "Not scheduled" }}</td>
                 <td>{{ post.hashtags }}</td>
                 <td class="actions">
-                    <a class="button" href="{{ url_for('main.edit_post', post_id=post.id) }}">Edit</a>
-                    {% if post.rss_item_id %}
+                    {% if post.is_rss_group %}
                     <a class="button" href="{{ url_for('main.edit_rss_article', rss_item_id=post.rss_item_id) }}">Edit versions</a>
-                    {% endif %}
+                    {% else %}
+                    <a class="button" href="{{ url_for('main.edit_post', post_id=post.id) }}">Edit</a>
                     <form method="post" action="{{ url_for('main.remove_post', post_id=post.id) }}">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button class="button danger" type="submit">Delete</button>
                     </form>
+                    {% endif %}
                 </td>
             </tr>
             {% else %}

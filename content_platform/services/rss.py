@@ -1,6 +1,7 @@
 from datetime import datetime
 from html import unescape
 import hashlib
+import os
 import re
 import unicodedata
 import xml.etree.ElementTree as ET
@@ -9,8 +10,8 @@ from urllib.request import Request, urlopen
 from urllib.parse import unquote, urlparse
 
 from ..database import get_connection, insert_and_get_id
-from ..models import Post, default_content_format
-from .scheduler import add_log, create_post
+from ..models import default_content_format
+from .scheduler import add_log
 
 
 USER_AGENT = "ContentAutomationPlatform/1.0"
@@ -54,7 +55,10 @@ def check_all_feeds():
             result = check_feed(feed)
         except Exception as exc:
             message = f"{feed['name']}: {exc}"
-            add_log(None, "ERROR", f"RSS check failed: {message}")
+            try:
+                add_log(None, "ERROR", f"RSS check failed: {message}")
+            except Exception:
+                pass
             errors.append(message)
             continue
         created += result["created"]
@@ -75,37 +79,33 @@ def check_feed(feed):
         return {"created": created, "skipped": skipped, "errors": errors}
 
     platforms = [item.strip() for item in feed["target_platforms"].split(",") if item.strip()]
-    for entry in entries[:15]:
-        guid = entry["guid"]
-        if item_exists(feed["id"], guid):
-            skipped += 1
-            continue
+    max_entries = int(os.environ.get("RSS_MAX_ENTRIES_PER_FEED", "10"))
+    with get_connection() as conn:
+        for entry in entries[:max_entries]:
+            guid = entry["guid"]
+            if _item_exists(conn, feed["id"], guid):
+                skipped += 1
+                continue
 
-        content_type = classify_content_type(entry["link"], fallback=feed["content_type"])
-        rss_item_id = remember_item(feed["id"], guid, entry["title"], entry["link"], content_type, None)
-        first_post_id = None
-        for platform in platforms:
-            post_id = create_post(
-                Post(
-                    title=_trim(entry["title"], 120),
-                    content=_draft_content(entry),
-                    hashtags=feed["default_hashtags"] or "",
-                    platform=platform,
-                    content_format=default_content_format(platform),
-                    scheduled_at="",
-                    status="Draft",
-                    rss_item_id=rss_item_id,
-                    source_type=content_type,
+            content_type = classify_content_type(entry["link"], fallback=feed["content_type"])
+            rss_item_id = _remember_item(conn, feed["id"], guid, entry["title"], entry["link"], content_type, None)
+            first_post_id = None
+            for platform in platforms:
+                post_id = _create_rss_draft(conn, feed, entry, platform, rss_item_id, content_type)
+                if first_post_id is None:
+                    first_post_id = post_id
+                conn.execute(
+                    "INSERT INTO logs (post_id, level, message) VALUES (?, ?, ?)",
+                    (post_id, "INFO", f"Draft created from RSS feed {feed['name']}."),
                 )
-            )
-            if first_post_id is None:
-                first_post_id = post_id
-            add_log(post_id, "INFO", f"Draft created from RSS feed {feed['name']}.")
-            created += 1
+                created += 1
 
-        update_item_post(rss_item_id, first_post_id)
+            conn.execute("UPDATE rss_items SET post_id = ? WHERE id = ?", (first_post_id, rss_item_id))
 
-    mark_feed_checked(feed["id"])
+        conn.execute(
+            "UPDATE rss_feeds SET last_checked_at = ? WHERE id = ?",
+            (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), feed["id"]),
+        )
     return {"created": created, "skipped": skipped, "errors": errors}
 
 
@@ -123,29 +123,12 @@ def fetch_feed_entries(url):
 
 def item_exists(feed_id, guid):
     with get_connection() as conn:
-        row = conn.execute(
-            "SELECT id FROM rss_items WHERE feed_id = ? AND item_guid = ?",
-            (feed_id, guid),
-        ).fetchone()
-    return row is not None
+        return _item_exists(conn, feed_id, guid)
 
 
 def remember_item(feed_id, guid, title, url, content_type, post_id):
     with get_connection() as conn:
-        row = conn.execute(
-            "SELECT id FROM rss_items WHERE feed_id = ? AND item_guid = ?",
-            (feed_id, guid),
-        ).fetchone()
-        if row:
-            return row["id"]
-        return insert_and_get_id(
-            conn,
-            """
-            INSERT INTO rss_items (feed_id, item_guid, title, url, content_type, post_id)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (feed_id, guid, title, url, content_type, post_id),
-        )
+        return _remember_item(conn, feed_id, guid, title, url, content_type, post_id)
 
 
 def update_item_post(rss_item_id, post_id):
@@ -159,6 +142,52 @@ def mark_feed_checked(feed_id):
             "UPDATE rss_feeds SET last_checked_at = ? WHERE id = ?",
             (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), feed_id),
         )
+
+
+def _item_exists(conn, feed_id, guid):
+    row = conn.execute(
+        "SELECT id FROM rss_items WHERE feed_id = ? AND item_guid = ?",
+        (feed_id, guid),
+    ).fetchone()
+    return row is not None
+
+
+def _remember_item(conn, feed_id, guid, title, url, content_type, post_id):
+    row = conn.execute(
+        "SELECT id FROM rss_items WHERE feed_id = ? AND item_guid = ?",
+        (feed_id, guid),
+    ).fetchone()
+    if row:
+        return row["id"]
+    return insert_and_get_id(
+        conn,
+        """
+        INSERT INTO rss_items (feed_id, item_guid, title, url, content_type, post_id)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (feed_id, guid, title, url, content_type, post_id),
+    )
+
+
+def _create_rss_draft(conn, feed, entry, platform, rss_item_id, content_type):
+    return insert_and_get_id(
+        conn,
+        """
+        INSERT INTO posts (title, content, hashtags, platform, content_format, rss_item_id, source_type, scheduled_at, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            _trim(entry["title"], 120),
+            _draft_content(entry),
+            feed["default_hashtags"] or "",
+            platform,
+            default_content_format(platform),
+            rss_item_id,
+            content_type,
+            "",
+            "Draft",
+        ),
+    )
 
 
 def _parse_rss(root):
