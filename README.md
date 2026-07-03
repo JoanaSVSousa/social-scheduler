@@ -25,7 +25,7 @@ This project is designed as an automation-focused academic project that can run 
 - Supabase/Postgres in production
 - HTML/CSS
 
-Production is pinned to Python 3.12 through `runtime.txt` for Render compatibility.
+Production is pinned to Python 3.12 through `.python-version`, `runtime.txt`, and `PYTHON_VERSION` in `render.yaml` for Render compatibility.
 
 ## Run Locally
 
