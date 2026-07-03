@@ -88,7 +88,7 @@
                 <td class="actions">
                     <a class="button" href="{{ url_for('main.edit_post', post_id=post.id) }}">Edit</a>
                     {% if post.rss_item_id %}
-                    <a class="button" href="{{ url_for('main.edit_rss_article', rss_item_id=post.rss_item_id) }}">Article</a>
+                    <a class="button" href="{{ url_for('main.edit_rss_article', rss_item_id=post.rss_item_id) }}">Edit versions</a>
                     {% endif %}
                     <form method="post" action="{{ url_for('main.remove_post', post_id=post.id) }}">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

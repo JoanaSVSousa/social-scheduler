@@ -376,7 +376,7 @@ Como explicar:
 
 Quando um artigo RSS gera posts para varias redes, esses posts ficam ligados ao mesmo artigo original.
 
-Isto evita uma lista visualmente confusa com muitos posts quase iguais.
+Isto evita perder contexto quando existem muitos posts quase iguais, mas mantem tudo dentro da area principal de `Posts`.
 
 Fluxo:
 
@@ -387,8 +387,8 @@ Artigo RSS
 └── versao X
 ```
 
-Na pagina `RSS Articles`, e possivel abrir um artigo e editar todas as versoes numa unica pagina.
+Na pagina `Posts`, os posts que vieram de RSS mostram a acao `Edit versions`. Essa vista permite editar todas as versoes numa unica pagina, escolher redes e definir varias datas de reaproveitamento.
 
 Como explicar:
 
-> Em vez de editar tres posts separados e perder contexto, agrupei os drafts por artigo de origem. Assim consigo adaptar o mesmo conteudo para Facebook, Bluesky e X numa unica vista.
+> Em vez de editar tres posts separados e perder contexto, agrupei os drafts por artigo de origem. Assim consigo adaptar o mesmo conteudo para Facebook, Bluesky e X numa unica vista, mas continuo a gerir tudo a partir da biblioteca principal de posts.

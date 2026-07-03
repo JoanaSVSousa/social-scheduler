@@ -446,6 +446,29 @@ label {
     width: auto;
 }
 
+.checkbox-grid {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.checkbox-pill {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--text);
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    padding: 10px 12px;
+}
+
+.checkbox-pill input {
+    min-height: auto;
+    width: auto;
+}
+
 .rss-layout {
     align-items: start;
 }

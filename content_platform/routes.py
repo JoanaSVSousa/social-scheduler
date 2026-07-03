@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 from urllib.parse import urlparse
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
@@ -17,7 +18,7 @@ from .services.analytics import build_platform_counts, build_status_counts
 from .services.media import delete_media, get_media_for_post, get_media_for_posts, save_media_files
 from .services.publisher import process_publication_queue
 from .services.rss import check_all_feeds, create_feed, delete_feed, list_feeds
-from .services.rss_groups import get_rss_group, list_rss_groups, update_rss_group_posts
+from .services.rss_groups import get_rss_group, list_rss_groups, sync_rss_group_platforms, update_rss_group_posts
 from .services.schedules import get_schedules_for_post, get_schedules_for_posts, replace_schedules
 from .services.scheduler import (
     create_post,
@@ -83,9 +84,15 @@ def edit_rss_article(rss_item_id):
 
     if request.method == "POST":
         validate_csrf()
+        selected_platforms = request.form.getlist("target_platforms")
+        if not selected_platforms or any(platform not in PLATFORMS for platform in selected_platforms):
+            abort(400)
+        item, posts = sync_rss_group_platforms(rss_item_id, selected_platforms)
         updates = []
         for post in posts:
             prefix = f"post_{post['id']}_"
+            if prefix + "title" not in request.form:
+                continue
             status = request.form.get(prefix + "status", post["status"])
             content_format = request.form.get(prefix + "content_format", post["content_format"])
             if status not in STATUSES:
@@ -107,15 +114,23 @@ def edit_rss_article(rss_item_id):
                 abort(400)
 
         update_rss_group_posts(updates)
+        for post in posts:
+            prefix = f"post_{post['id']}_"
+            if prefix + "title" not in request.form:
+                continue
+            replace_schedules(post["id"], _schedule_dates_from_prefixed_form(prefix))
         flash("Article versions updated.", "success")
         return redirect(url_for("main.edit_rss_article", rss_item_id=rss_item_id))
 
+    schedules_by_post = get_schedules_for_posts([post["id"] for post in posts])
     return render_template(
         "rss_article_edit.html",
         item=item,
         posts=posts,
+        schedules_by_post=schedules_by_post,
         content_formats=PLATFORM_CONTENT_FORMATS,
         statuses=STATUSES,
+        platforms=PLATFORMS,
     )
 
 
@@ -208,7 +223,7 @@ def login():
             from flask import session
 
             session["admin_authenticated"] = True
-            return redirect(_safe_next_url() or url_for("main.rss_feeds"))
+            return redirect(_safe_next_url() or url_for("main.dashboard"))
         flash("Invalid password.", "warning")
 
     return render_template("login.html")
@@ -326,6 +341,38 @@ def _schedule_dates_from_form():
     extra_dates = request.form.get("schedule_dates", "")
     dates.extend(line.strip() for line in extra_dates.splitlines())
     return dates
+
+
+def _schedule_dates_from_prefixed_form(prefix):
+    dates = []
+    primary = request.form.get(prefix + "scheduled_at", "").strip()
+    if primary:
+        dates.append(primary)
+
+    extra_dates = request.form.get(prefix + "schedule_dates", "")
+    dates.extend(line.strip() for line in extra_dates.splitlines())
+    dates.extend(_recurring_dates_from_form(prefix))
+    return dates
+
+
+def _recurring_dates_from_form(prefix):
+    start = request.form.get(prefix + "repeat_start", "").strip()
+    count = request.form.get(prefix + "repeat_count", "").strip()
+    interval_days = request.form.get(prefix + "repeat_interval_days", "").strip()
+    if not start or not count or not interval_days:
+        return []
+
+    try:
+        count_value = min(int(count), 24)
+        interval_value = max(int(interval_days), 1)
+        start_date = datetime.fromisoformat(start)
+    except ValueError:
+        abort(400)
+
+    return [
+        (start_date + timedelta(days=interval_value * index)).strftime("%Y-%m-%dT%H:%M")
+        for index in range(count_value)
+    ]
 
 
 def _safe_next_url():

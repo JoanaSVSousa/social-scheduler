@@ -13,7 +13,6 @@
             <a href="{{ url_for('main.dashboard') }}">Dashboard</a>
             <a href="{{ url_for('main.posts') }}">Posts</a>
             <a href="{{ url_for('main.rss_feeds') }}">RSS</a>
-            <a href="{{ url_for('main.rss_articles') }}">RSS Articles</a>
             <a href="{{ url_for('main.logs') }}">Logs</a>
             <a class="button" href="{{ url_for('main.new_post') }}">New Post</a>
             {% if session.get("admin_authenticated") %}

@@ -18,8 +18,27 @@
 <form method="post" class="version-editor">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
+    <section class="source-panel">
+        <strong>Networks for this article</strong>
+        <small>Select where this article should exist as an editable post version.</small>
+        <div class="checkbox-grid">
+            {% for platform in platforms %}
+            <label class="checkbox-pill">
+                <input
+                    type="checkbox"
+                    name="target_platforms"
+                    value="{{ platform }}"
+                    {% if posts|selectattr("platform", "equalto", platform)|list %}checked{% endif %}
+                >
+                {{ platform }}
+            </label>
+            {% endfor %}
+        </div>
+    </section>
+
     {% for post in posts %}
     {% set prefix = "post_" ~ post.id ~ "_" %}
+    {% set schedule_items = schedules_by_post.get(post.id, []) %}
     <article class="version-card">
         <div class="version-card-header">
             <div>
@@ -60,7 +79,7 @@
 
         <div class="form-row">
             <label>
-                Scheduled date
+                Main scheduled date
                 <input type="datetime-local" name="{{ prefix }}scheduled_at" value="{{ post.scheduled_at }}">
             </label>
             <label>
@@ -68,12 +87,33 @@
                 <input name="{{ prefix }}hashtags" maxlength="400" value="{{ post.hashtags }}">
             </label>
         </div>
+
+        <label>
+            Recycling dates
+            <textarea name="{{ prefix }}schedule_dates" rows="4" placeholder="2026-07-10T18:00&#10;2026-07-24T18:00">{% for item in schedule_items %}{{ item.scheduled_at }}{% if not loop.last %}
+{% endif %}{% endfor %}</textarea>
+        </label>
+
+        <div class="form-row">
+            <label>
+                Repeat from
+                <input type="datetime-local" name="{{ prefix }}repeat_start">
+            </label>
+            <label>
+                Times
+                <input type="number" name="{{ prefix }}repeat_count" min="1" max="24" placeholder="4">
+            </label>
+            <label>
+                Every N days
+                <input type="number" name="{{ prefix }}repeat_interval_days" min="1" max="365" placeholder="14">
+            </label>
+        </div>
     </article>
     {% endfor %}
 
     <div class="form-actions sticky-actions">
         <button class="button primary" type="submit">Save all versions</button>
-        <a class="button" href="{{ url_for('main.rss_articles') }}">Back</a>
+        <a class="button" href="{{ url_for('main.posts') }}">Back to posts</a>
     </div>
 </form>
 {% endblock %}
