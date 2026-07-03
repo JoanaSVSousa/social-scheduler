@@ -28,6 +28,7 @@ from .services.scheduler import (
     get_post,
     update_post,
 )
+from .services.squared_feeds import SQUARED_FEEDS
 
 
 bp = Blueprint("main", __name__)
@@ -278,6 +279,27 @@ def check_rss():
     flash(f"RSS checked. {result['created']} draft(s) created, {result['skipped']} item(s) skipped.", "success")
     for error in result["errors"]:
         flash(error, "warning")
+    return redirect(url_for("main.rss_feeds"))
+
+
+@bp.post("/rss/seed-squared")
+@login_required
+def seed_squared_rss():
+    validate_csrf()
+    existing_urls = {feed["url"] for feed in list_feeds()}
+    created = 0
+    skipped = 0
+
+    for feed in SQUARED_FEEDS:
+        if feed["url"] in existing_urls:
+            skipped += 1
+            continue
+        if create_feed(feed["name"], feed["url"], feed["platforms"], feed["hashtags"]):
+            created += 1
+        else:
+            skipped += 1
+
+    flash(f"Squared feeds seeded. {created} created, {skipped} already present.", "success")
     return redirect(url_for("main.rss_feeds"))
 
 

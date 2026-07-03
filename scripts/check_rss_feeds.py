@@ -19,3 +19,5 @@ with app.app_context():
     )
     for error in result["errors"]:
         print(f"ERROR: {error}")
+    if result["errors"]:
+        raise SystemExit(1)

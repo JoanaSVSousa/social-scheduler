@@ -6,10 +6,16 @@
         <p class="eyebrow">Private Automation</p>
         <h1>RSS intake</h1>
     </div>
-    <form method="post" action="{{ url_for('main.check_rss') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button class="button primary" type="submit">Check feeds now</button>
-    </form>
+    <div class="form-actions">
+        <form method="post" action="{{ url_for('main.seed_squared_rss') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="button" type="submit">Seed Squared feeds</button>
+        </form>
+        <form method="post" action="{{ url_for('main.check_rss') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="button primary" type="submit">Check feeds now</button>
+        </form>
+    </div>
 </div>
 
 <section class="grid two rss-layout">

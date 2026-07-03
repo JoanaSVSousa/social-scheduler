@@ -71,3 +71,21 @@ Safe GitHub checklist:
 - Configure daily/weekly email report script.
 - Decide where uploads should live.
 - Set `DATABASE_URL` when using Supabase/Postgres.
+
+## Render Cron Jobs
+
+Use a Render Cron Job for the RSS automation instead of keeping the web process busy.
+
+Command:
+
+```bash
+python3 scripts/check_rss_feeds.py
+```
+
+Schedule for every 2 hours:
+
+```txt
+0 */2 * * *
+```
+
+The Cron Job must use the same environment variables as the web service, especially `DATABASE_URL`.

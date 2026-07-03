@@ -77,15 +77,42 @@ Then open:
 http://127.0.0.1:5000/rss
 ```
 
-## Hourly RSS Task
+## Squared Potato RSS Feeds
 
-On PythonAnywhere, schedule this script to run hourly:
+Seed the Squared Potato feeds in the current database:
+
+```bash
+python3 scripts/seed_squared_feeds.py
+```
+
+Seed and immediately import new items as draft posts:
+
+```bash
+python3 scripts/seed_squared_feeds.py --check-now
+```
+
+Configured feeds:
+
+- jogos: Facebook, Bluesky, X
+- filmes: Facebook, Bluesky, X
+- livros: Facebook, Bluesky, X
+- tecnologia: Facebook, Bluesky, X
+
+## Recurring RSS Task
+
+On Render, create a Cron Job that runs every 2 hours:
 
 ```bash
 python3 scripts/check_rss_feeds.py
 ```
 
 It checks active RSS feeds, skips already imported items, and creates draft posts for the configured target platforms.
+
+Recommended schedule:
+
+```txt
+0 */2 * * *
+```
 
 ## Email Dashboard Report
 
