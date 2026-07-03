@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="section-title">
+    <div>
+        <p class="eyebrow">RSS Workspace</p>
+        <h1>Articles</h1>
+    </div>
+    <a class="button" href="{{ url_for('main.rss_feeds') }}">Manage feeds</a>
+</div>
+
+<div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>Article</th>
+                <th>Feed</th>
+                <th>Platforms</th>
+                <th>Type</th>
+                <th>Drafts</th>
+                <th>Created</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for group in groups %}
+            <tr>
+                <td>
+                    <strong>{{ group.title }}</strong>
+                    <small>{{ group.url }}</small>
+                </td>
+                <td>{{ group.feed_name }}</td>
+                <td>{{ group.platforms or "-" }}</td>
+                <td><span class="type-pill {{ group.content_type|lower }}">{{ group.content_type }}</span></td>
+                <td>{{ group.draft_count or 0 }} / {{ group.post_count or 0 }}</td>
+                <td>{{ group.created_at }}</td>
+                <td>
+                    <a class="button primary" href="{{ url_for('main.edit_rss_article', rss_item_id=group.id) }}">Edit versions</a>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7">No RSS articles imported yet.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

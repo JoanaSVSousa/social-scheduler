@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="section-title">
+    <div>
+        <p class="eyebrow">Private Automation</p>
+        <h1>RSS intake</h1>
+    </div>
+    <form method="post" action="{{ url_for('main.check_rss') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="button primary" type="submit">Check feeds now</button>
+    </form>
+</div>
+
+<section class="grid two rss-layout">
+    <form class="form" method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <h2>Add RSS feed</h2>
+        <label>
+            Feed name
+            <input name="name" maxlength="120" required placeholder="Mais Algarve News">
+        </label>
+        <label>
+            RSS URL
+            <input type="url" name="url" maxlength="500" required placeholder="https://example.com/feed.xml">
+        </label>
+        <fieldset class="checkbox-group">
+            <legend>Target platforms</legend>
+            {% for platform in platforms %}
+            <label>
+                <input type="checkbox" name="target_platforms" value="{{ platform }}">
+                {{ platform }}
+            </label>
+            {% endfor %}
+        </fieldset>
+        <label>
+            Default hashtags
+            <input name="default_hashtags" maxlength="400" placeholder="#algarve #news">
+        </label>
+        <div class="form-actions">
+            <button class="button primary" type="submit">Add feed</button>
+        </div>
+    </form>
+
+    <div>
+        <div class="section-title">
+            <h2>Configured feeds</h2>
+        </div>
+        <div class="feed-list">
+            {% for feed in feeds %}
+            <article class="feed-card">
+                <div>
+                    <strong>{{ feed.name }}</strong>
+                    <span>{{ feed.url }}</span>
+                    <small><span class="type-pill {{ feed.content_type|lower }}">{{ feed.content_type }}</span></small>
+                    <small>{{ feed.target_platforms }}{% if feed.default_hashtags %} · {{ feed.default_hashtags }}{% endif %}</small>
+                    <small>Last checked: {{ feed.last_checked_at or "Never" }}</small>
+                </div>
+                <form method="post" action="{{ url_for('main.remove_rss_feed', feed_id=feed.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="button danger" type="submit">Delete</button>
+                </form>
+            </article>
+            {% else %}
+            <p class="muted">No RSS feeds configured yet.</p>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endblock %}

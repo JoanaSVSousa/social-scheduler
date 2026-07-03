@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="section-title">
+    <div>
+        <p class="eyebrow">{{ item.feed_name }}</p>
+        <h1>Edit article versions</h1>
+    </div>
+    <a class="button" href="{{ item.url }}" target="_blank" rel="noopener">Open source</a>
+</div>
+
+<section class="source-panel">
+    <strong>{{ item.title }}</strong>
+    <small><span class="type-pill {{ item.content_type|lower }}">{{ item.content_type }}</span></small>
+    <span>{{ item.url }}</span>
+</section>
+
+<form method="post" class="version-editor">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    {% for post in posts %}
+    {% set prefix = "post_" ~ post.id ~ "_" %}
+    <article class="version-card">
+        <div class="version-card-header">
+            <div>
+                <p class="eyebrow">{{ post.platform }}</p>
+                <h2>{{ post.platform }} version</h2>
+            </div>
+            <span class="status {{ post.status|lower }}">{{ post.status }}</span>
+        </div>
+
+        <label>
+            Title
+            <input name="{{ prefix }}title" maxlength="120" required value="{{ post.title }}">
+        </label>
+
+        <label>
+            Content
+            <textarea name="{{ prefix }}content" rows="8" maxlength="2200" required>{{ post.content }}</textarea>
+        </label>
+
+        <div class="form-row">
+            <label>
+                Format
+                <select name="{{ prefix }}content_format">
+                    {% for format in content_formats[post.platform] %}
+                    <option value="{{ format }}" {% if post.content_format == format %}selected{% endif %}>{{ format }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>
+                Status
+                <select name="{{ prefix }}status">
+                    {% for status in statuses %}
+                    <option value="{{ status }}" {% if post.status == status %}selected{% endif %}>{{ status }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+        </div>
+
+        <div class="form-row">
+            <label>
+                Scheduled date
+                <input type="datetime-local" name="{{ prefix }}scheduled_at" value="{{ post.scheduled_at }}">
+            </label>
+            <label>
+                Hashtags
+                <input name="{{ prefix }}hashtags" maxlength="400" value="{{ post.hashtags }}">
+            </label>
+        </div>
+    </article>
+    {% endfor %}
+
+    <div class="form-actions sticky-actions">
+        <button class="button primary" type="submit">Save all versions</button>
+        <a class="button" href="{{ url_for('main.rss_articles') }}">Back</a>
+    </div>
+</form>
+{% endblock %}

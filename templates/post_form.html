@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="section-title">
+    <div>
+        <p class="eyebrow">{{ action }} Content</p>
+        <h1>{{ action }} post</h1>
+    </div>
+</div>
+
+<form class="form" method="post" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% if post %}
+    <input type="hidden" name="post_id" value="{{ post.id }}">
+    {% endif %}
+    <label>
+        Title
+        <input name="title" maxlength="120" required value="{{ post.title if post else '' }}">
+    </label>
+
+    <label>
+        Content
+        <textarea name="content" rows="8" maxlength="2200" required>{{ post.content if post else '' }}</textarea>
+    </label>
+
+    <label>
+        Hashtags
+        <input name="hashtags" maxlength="400" placeholder="#python #automation" value="{{ post.hashtags if post else '' }}">
+    </label>
+
+    <div class="form-row">
+        <label>
+            Platform
+            <select name="platform" id="platform-select" required>
+                {% for platform in platforms %}
+                <option value="{{ platform }}" {% if post and post.platform == platform %}selected{% endif %}>{{ platform }}</option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <label>
+            Content format
+            <select name="content_format" id="format-select" required></select>
+        </label>
+    </div>
+
+    <div class="form-row">
+        <label>
+            Status
+            <select name="status" id="status-select" required>
+                {% for status in statuses %}
+                <option value="{{ status }}" {% if post and post.status == status %}selected{% endif %}>{{ status }}</option>
+                {% endfor %}
+            </select>
+        </label>
+    </div>
+
+    <label>
+        Scheduled date and time
+        <input type="datetime-local" name="scheduled_at" id="scheduled-at" value="{{ post.scheduled_at if post else '' }}">
+    </label>
+
+    <label>
+        Recycling schedule dates
+        <textarea name="schedule_dates" rows="4" placeholder="2026-06-25T09:00&#10;2026-06-30T18:30">{% if schedules %}{% for schedule in schedules %}{{ schedule.scheduled_at }}{% if not loop.last %}
+{% endif %}{% endfor %}{% endif %}</textarea>
+        <span class="field-help">One date per line. Use this when the same post should be published more than once.</span>
+    </label>
+
+    <section class="media-panel">
+        <div>
+            <h2>Media</h2>
+            <p id="media-guide">{{ media_guides[(post.platform if post else platforms[0])] }}</p>
+            <p id="format-guide" class="format-guide"></p>
+        </div>
+        <label class="upload-box">
+            Add images or videos
+            <input type="file" name="media_files" accept="image/*,video/*" multiple>
+            <span>Supported: PNG, JPG, WEBP, GIF, MP4, MOV, M4V, WEBM.</span>
+        </label>
+
+        {% if media %}
+        <div class="media-grid">
+            {% for item in media %}
+            <article class="media-card">
+                {% if item.media_type == "video" %}
+                <video src="{{ url_for('static', filename='uploads/' ~ item.filename) }}" controls></video>
+                {% else %}
+                <img src="{{ url_for('static', filename='uploads/' ~ item.filename) }}" alt="{{ item.original_filename }}">
+                {% endif %}
+                <div>
+                    <strong>{{ item.original_filename }}</strong>
+                    <button
+                        class="button danger"
+                        type="submit"
+                        formmethod="post"
+                        formaction="{{ url_for('main.remove_media', media_id=item.id) }}"
+                    >Remove</button>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </section>
+
+    <div class="form-actions">
+        <button class="button primary" type="submit">{{ action }} Post</button>
+        <a class="button" href="{{ url_for('main.posts') }}">Cancel</a>
+    </div>
+</form>
+
+<script>
+const mediaGuides = {{ media_guides|tojson }};
+const contentFormats = {{ content_formats|tojson }};
+const formatGuides = {{ format_guides|tojson }};
+const platformSelect = document.querySelector("#platform-select");
+const formatSelect = document.querySelector("#format-select");
+const statusSelect = document.querySelector("#status-select");
+const scheduledAt = document.querySelector("#scheduled-at");
+const mediaGuide = document.querySelector("#media-guide");
+const formatGuide = document.querySelector("#format-guide");
+const selectedFormat = {{ (post.content_format if post else '')|tojson }};
+
+function syncFormats() {
+    const platform = platformSelect.value;
+    const formats = contentFormats[platform] || ["Post"];
+    const current = formatSelect.value || selectedFormat;
+    formatSelect.innerHTML = "";
+
+    formats.forEach((format) => {
+        const option = document.createElement("option");
+        option.value = format;
+        option.textContent = format;
+        if (format === current) {
+            option.selected = true;
+        }
+        formatSelect.appendChild(option);
+    });
+    syncGuides();
+}
+
+function syncGuides() {
+    const platform = platformSelect.value;
+    const format = formatSelect.value;
+    mediaGuide.textContent = mediaGuides[platformSelect.value] || "";
+    formatGuide.textContent = (formatGuides[platform] && formatGuides[platform][format]) || "";
+}
+
+platformSelect.addEventListener("change", syncFormats);
+formatSelect.addEventListener("change", syncGuides);
+statusSelect.addEventListener("change", () => {
+    scheduledAt.required = statusSelect.value === "Scheduled";
+});
+syncFormats();
+scheduledAt.required = statusSelect.value === "Scheduled";
+</script>
+{% endblock %}

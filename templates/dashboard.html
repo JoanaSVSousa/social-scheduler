@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="hero">
+    <div>
+        <p class="eyebrow">Automation Mission Control</p>
+        <h1>Plan, schedule, and track content workflows.</h1>
+    </div>
+    <form method="post" action="{{ url_for('main.process_queue') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="button primary" type="submit">Process Queue</button>
+    </form>
+</section>
+
+<section class="metrics">
+    {% for label, value in status_counts.items() %}
+    <article class="metric">
+        <span>{{ label }}</span>
+        <strong>{{ value }}</strong>
+    </article>
+    {% endfor %}
+</section>
+
+<section class="grid two">
+    <div>
+        <div class="section-title">
+            <h2>Upcoming Queue</h2>
+            <a href="{{ url_for('main.posts') }}">View all</a>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Platform</th>
+                        <th>Format</th>
+                        <th>Status</th>
+                        <th>Media</th>
+                        <th>Schedules</th>
+                        <th>Scheduled</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for post in posts %}
+                    <tr>
+                        <td>{{ post.title }}</td>
+                        <td>{{ post.platform }}</td>
+                        <td>{{ post.content_format }}</td>
+                        <td><span class="status {{ post.status|lower }}">{{ post.status }}</span></td>
+                        <td>
+                            {% set media_count = media_by_post.get(post.id, [])|length %}
+                            <span class="media-count">{{ media_count }} file{% if media_count != 1 %}s{% endif %}</span>
+                        </td>
+                        <td>
+                            {% set schedule_count = schedules_by_post.get(post.id, [])|length %}
+                            <span class="media-count">{{ schedule_count }} date{% if schedule_count != 1 %}s{% endif %}</span>
+                        </td>
+                        <td>{{ post.scheduled_at or "Not scheduled" }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7">No posts yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div>
+        <div class="section-title">
+            <h2>Platforms</h2>
+        </div>
+        <div class="platform-list">
+            {% for platform, count in platform_counts.items() %}
+            <div><span>{{ platform }}</span><strong>{{ count }}</strong></div>
+            {% else %}
+            <p>No platform data yet.</p>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endblock %}
