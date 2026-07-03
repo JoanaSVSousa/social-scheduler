@@ -21,6 +21,9 @@ def create_app():
     app.config["DATABASE"] = str(DEFAULT_DB_PATH)
     app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", token_urlsafe(32))
     app.config["MAX_CONTENT_LENGTH"] = 40 * 1024 * 1024
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    app.config["SESSION_COOKIE_SECURE"] = os.environ.get("SESSION_COOKIE_SECURE", "1") == "1"
 
     init_db(app.config["DATABASE"])
     app.context_processor(lambda: {"csrf_token": csrf_token})
