@@ -50,7 +50,13 @@ def check_all_feeds():
     for feed in list_feeds():
         if not feed["is_active"]:
             continue
-        result = check_feed(feed)
+        try:
+            result = check_feed(feed)
+        except Exception as exc:
+            message = f"{feed['name']}: {exc}"
+            add_log(None, "ERROR", f"RSS check failed: {message}")
+            errors.append(message)
+            continue
         created += result["created"]
         skipped += result["skipped"]
         errors.extend(result["errors"])

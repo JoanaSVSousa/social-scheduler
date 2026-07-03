@@ -277,6 +277,8 @@ def check_rss():
     validate_csrf()
     result = check_all_feeds()
     flash(f"RSS checked. {result['created']} draft(s) created, {result['skipped']} item(s) skipped.", "success")
+    if result["errors"]:
+        flash(f"{len(result['errors'])} RSS error(s) found. Check logs for details.", "warning")
     for error in result["errors"]:
         flash(error, "warning")
     return redirect(url_for("main.rss_feeds"))

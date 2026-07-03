@@ -24,7 +24,7 @@ def list_rss_groups():
             FROM rss_items
             JOIN rss_feeds ON rss_feeds.id = rss_items.feed_id
             LEFT JOIN posts ON posts.rss_item_id = rss_items.id
-            GROUP BY rss_items.id
+            GROUP BY rss_items.id, rss_feeds.name
             ORDER BY rss_items.created_at DESC
             """
         ).fetchall()
