@@ -44,7 +44,7 @@ def delete_feed(feed_id):
         conn.execute("DELETE FROM rss_feeds WHERE id = ?", (feed_id,))
 
 
-def check_all_feeds():
+def check_all_feeds(max_entries_per_feed=None):
     created = 0
     skipped = 0
     errors = []
@@ -52,7 +52,7 @@ def check_all_feeds():
         if not feed["is_active"]:
             continue
         try:
-            result = check_feed(feed)
+            result = check_feed(feed, max_entries_per_feed=max_entries_per_feed)
         except Exception as exc:
             message = f"{feed['name']}: {exc}"
             try:
@@ -67,7 +67,7 @@ def check_all_feeds():
     return {"created": created, "skipped": skipped, "errors": errors}
 
 
-def check_feed(feed):
+def check_feed(feed, max_entries_per_feed=None):
     created = 0
     skipped = 0
     errors = []
@@ -79,7 +79,7 @@ def check_feed(feed):
         return {"created": created, "skipped": skipped, "errors": errors}
 
     platforms = [item.strip() for item in feed["target_platforms"].split(",") if item.strip()]
-    max_entries = int(os.environ.get("RSS_MAX_ENTRIES_PER_FEED", "10"))
+    max_entries = max_entries_per_feed or int(os.environ.get("RSS_MAX_ENTRIES_PER_FEED", "10"))
     with get_connection() as conn:
         for entry in entries[:max_entries]:
             guid = entry["guid"]

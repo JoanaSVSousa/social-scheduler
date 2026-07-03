@@ -323,8 +323,12 @@ def rss_feeds():
 @login_required
 def check_rss():
     validate_csrf()
-    result = check_all_feeds()
-    flash(f"RSS checked. {result['created']} draft(s) created, {result['skipped']} item(s) skipped.", "success")
+    result = check_all_feeds(max_entries_per_feed=2)
+    flash(
+        f"Quick RSS check finished. {result['created']} draft(s) created, "
+        f"{result['skipped']} item(s) skipped.",
+        "success",
+    )
     if result["errors"]:
         flash(f"{len(result['errors'])} RSS error(s) found. Check logs for details.", "warning")
     for error in result["errors"]:

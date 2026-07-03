@@ -112,6 +112,8 @@ python3 scripts/check_rss_feeds.py
 
 It checks active RSS feeds, skips already imported items, and creates draft posts for the configured target platforms.
 
+The in-app `Check feeds now` button runs a quick check only. Use the Render Cron Job for the regular full automation.
+
 Recommended schedule:
 
 ```txt
