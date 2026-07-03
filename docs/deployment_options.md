@@ -45,6 +45,7 @@ Current project status:
 - Secrets must be configured in Render environment variables, not committed to GitHub.
 - The database layer supports local SQLite and Supabase/Postgres via `DATABASE_URL`.
 - Before using media uploads heavily in production, move uploads to persistent object storage.
+- On Render, use the Supabase pooler connection string for `DATABASE_URL`. If the direct database URL fails with `Network is unreachable`, it is probably resolving to IPv6.
 
 Safe GitHub checklist:
 

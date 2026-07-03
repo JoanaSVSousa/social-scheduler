@@ -46,10 +46,12 @@ http://127.0.0.1:5000
 
 The app uses SQLite when `DATABASE_URL` is not set. For Render + Supabase, set `DATABASE_URL` in Render using the Supabase Postgres connection string.
 
+On Render, prefer the Supabase pooler connection string instead of the direct database host. The direct host can resolve to IPv6 and fail from Render with `Network is unreachable`.
+
 Use a connection string shaped like:
 
 ```txt
-postgresql://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require
+postgresql://USER:PASSWORD@POOLER_HOST:6543/postgres?sslmode=require
 ```
 
 Do not commit the real value to GitHub.
