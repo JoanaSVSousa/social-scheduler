@@ -24,6 +24,12 @@ def list_feeds():
     return [_feed_with_health(feed) for feed in feeds]
 
 
+def get_feed(feed_id):
+    with get_connection() as conn:
+        feed = conn.execute("SELECT * FROM rss_feeds WHERE id = ?", (feed_id,)).fetchone()
+    return _feed_with_health(feed) if feed else None
+
+
 def create_feed(name, url, target_platforms, default_hashtags):
     content_type = classify_content_type(url)
     with get_connection() as conn:
@@ -38,6 +44,26 @@ def create_feed(name, url, target_platforms, default_hashtags):
             (name, url, ",".join(target_platforms), default_hashtags, content_type),
         )
 
+    return True
+
+
+def update_feed(feed_id, name, url, target_platforms, default_hashtags):
+    content_type = classify_content_type(url)
+    with get_connection() as conn:
+        existing = conn.execute(
+            "SELECT id FROM rss_feeds WHERE url = ? AND id != ?",
+            (url, feed_id),
+        ).fetchone()
+        if existing:
+            return False
+        conn.execute(
+            """
+            UPDATE rss_feeds
+            SET name = ?, url = ?, target_platforms = ?, default_hashtags = ?, content_type = ?
+            WHERE id = ?
+            """,
+            (name, url, ",".join(target_platforms), default_hashtags, content_type, feed_id),
+        )
     return True
 
 

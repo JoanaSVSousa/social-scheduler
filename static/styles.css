@@ -566,6 +566,23 @@ label {
     overflow-wrap: anywhere;
 }
 
+.feed-actions {
+    align-items: stretch;
+    display: flex !important;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 92px;
+}
+
+.feed-actions form {
+    margin: 0;
+}
+
+.feed-actions .button,
+.feed-actions button {
+    width: 100%;
+}
+
 .health-badge {
     border-radius: 999px;
     display: inline-flex;

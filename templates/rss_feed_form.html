@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="section-title">
+    <div>
+        <p class="eyebrow">RSS settings</p>
+        <h1>Edit feed</h1>
+    </div>
+    <a class="button" href="{{ url_for('main.rss_feeds') }}">Back to RSS</a>
+</div>
+
+<form class="form" method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>
+        Feed name
+        <input name="name" maxlength="120" required value="{{ feed.name }}">
+    </label>
+    <label>
+        RSS URL
+        <input type="url" name="url" maxlength="500" required value="{{ feed.url }}">
+    </label>
+    <fieldset class="checkbox-group">
+        <legend>Target platforms</legend>
+        {% for platform in platforms %}
+        <label>
+            <input
+                type="checkbox"
+                name="target_platforms"
+                value="{{ platform }}"
+                {% if platform in feed.target_platforms.split(",") %}checked{% endif %}
+            >
+            {{ platform }}
+        </label>
+        {% endfor %}
+    </fieldset>
+    <label>
+        Default hashtags
+        <input name="default_hashtags" maxlength="400" value="{{ feed.default_hashtags }}">
+    </label>
+    <div class="form-actions">
+        <button class="button primary" type="submit">Save feed</button>
+        <a class="button" href="{{ url_for('main.rss_feeds') }}">Cancel</a>
+    </div>
+</form>
+{% endblock %}

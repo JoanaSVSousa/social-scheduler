@@ -61,16 +61,18 @@
                         <span class="health-badge {{ feed.health_class }}">{{ feed.health_badge }}</span>
                     </div>
                     <span>{{ feed.url }}</span>
-                    <small><span class="type-pill {{ feed.content_type|lower }}">{{ feed.content_type }}</span></small>
-                    <small>{{ feed.target_platforms }}{% if feed.default_hashtags %} · {{ feed.default_hashtags }}{% endif %}</small>
+                    <small>{{ feed.target_platforms }}{% if feed.default_hashtags %} · {{ feed.default_hashtags }}{% endif %} · {{ feed.content_type }}</small>
                     <small>Last checked: {{ feed.last_checked_at or "Never" }}</small>
                     <small>Last result: {{ feed.last_check_message or "No check result yet." }}</small>
                     <small>{{ feed.last_created_count or 0 }} created · {{ feed.last_skipped_count or 0 }} skipped · {{ feed.last_error_count or 0 }} errors</small>
                 </div>
-                <form method="post" action="{{ url_for('main.remove_rss_feed', feed_id=feed.id) }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button class="button danger" type="submit">Delete</button>
-                </form>
+                <div class="feed-actions">
+                    <a class="button" href="{{ url_for('main.edit_rss_feed', feed_id=feed.id) }}">Edit</a>
+                    <form method="post" action="{{ url_for('main.remove_rss_feed', feed_id=feed.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="button danger" type="submit">Delete</button>
+                    </form>
+                </div>
             </article>
             {% else %}
             <p class="muted">No RSS feeds configured yet.</p>

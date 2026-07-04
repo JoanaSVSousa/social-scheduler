@@ -17,7 +17,7 @@ from .auth import is_logged_in, login_required, verify_admin_credentials
 from .services.analytics import build_platform_counts, build_status_counts
 from .services.media import delete_media, get_media_for_post, get_media_for_posts, save_media_files
 from .services.publisher import process_publication_queue
-from .services.rss import check_all_feeds, create_feed, delete_feed, list_feeds
+from .services.rss import check_all_feeds, create_feed, delete_feed, get_feed, list_feeds, update_feed
 from .services.rss_groups import get_rss_group, list_rss_groups, sync_rss_group_platforms, update_rss_group_posts
 from .services.schedules import get_schedules_for_post, get_schedules_for_posts, replace_schedules
 from .services.scheduler import (
@@ -355,6 +355,37 @@ def seed_squared_rss():
 
     flash(f"Squared feeds seeded. {created} created, {skipped} already present.", "success")
     return redirect(url_for("main.rss_feeds"))
+
+
+@bp.route("/rss/<int:feed_id>/edit", methods=["GET", "POST"])
+@login_required
+def edit_rss_feed(feed_id):
+    feed = get_feed(feed_id)
+    if feed is None:
+        abort(404)
+
+    if request.method == "POST":
+        validate_csrf()
+        platforms = request.form.getlist("target_platforms")
+        name = request.form["name"].strip()
+        url = request.form["url"].strip()
+        if not platforms or any(platform not in PLATFORMS for platform in platforms):
+            abort(400)
+        if not name or len(name) > 120 or not _is_safe_feed_url(url):
+            abort(400)
+        updated = update_feed(
+            feed_id,
+            name,
+            url,
+            platforms,
+            request.form.get("default_hashtags", "").strip(),
+        )
+        if updated:
+            flash("RSS feed updated.", "success")
+            return redirect(url_for("main.rss_feeds"))
+        flash("Another RSS feed already uses that URL.", "warning")
+
+    return render_template("rss_feed_form.html", feed=feed, platforms=PLATFORMS)
 
 
 @bp.post("/rss/<int:feed_id>/delete")
