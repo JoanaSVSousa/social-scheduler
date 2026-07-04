@@ -18,8 +18,22 @@ from .auth import is_logged_in, login_required, verify_admin_credentials
 from .services.analytics import build_platform_counts, build_status_counts
 from .services.media import delete_media, get_media_for_post, get_media_for_posts, save_media_files
 from .services.publisher import process_publication_queue
-from .services.rss import check_all_feeds, create_feed, delete_feed, get_feed, list_feeds, update_feed
-from .services.rss_groups import get_rss_group, list_rss_groups, sync_rss_group_platforms, update_rss_group_posts
+from .services.rss import (
+    check_all_feeds,
+    create_feed,
+    delete_feed,
+    get_feed,
+    list_feeds,
+    refresh_rss_content_types,
+    update_feed,
+)
+from .services.rss_groups import (
+    delete_rss_group,
+    get_rss_group,
+    list_rss_groups,
+    sync_rss_group_platforms,
+    update_rss_group_posts,
+)
 from .services.schedules import get_schedules_for_post, get_schedules_for_posts, replace_schedules
 from .services.scheduler import (
     create_post,
@@ -37,6 +51,7 @@ bp = Blueprint("main", __name__)
 
 @bp.route("/")
 def dashboard():
+    refresh_rss_content_types()
     posts = get_all_posts()
     post_ids = [post["id"] for post in posts]
     media_by_post = get_media_for_posts(post_ids)
@@ -56,6 +71,7 @@ def dashboard():
 
 @bp.route("/posts")
 def posts():
+    refresh_rss_content_types()
     filters = {
         "status": request.args.get("status", ""),
         "platform": request.args.get("platform", ""),
@@ -364,6 +380,14 @@ def remove_media(media_id):
 def remove_post(post_id):
     validate_csrf()
     delete_post(post_id)
+    return redirect(url_for("main.posts"))
+
+
+@bp.post("/rss/articles/<int:rss_item_id>/delete")
+def remove_rss_article(rss_item_id):
+    validate_csrf()
+    delete_rss_group(rss_item_id)
+    flash("RSS article and its network versions deleted.", "success")
     return redirect(url_for("main.posts"))
 
 

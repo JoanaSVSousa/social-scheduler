@@ -1,5 +1,6 @@
 from ..database import get_connection, insert_and_get_id
 from ..models import default_content_format
+from .media import delete_media
 
 
 def list_rss_groups():
@@ -139,3 +140,27 @@ def update_rss_group_posts(post_updates):
                 "INSERT INTO logs (post_id, level, message) VALUES (?, ?, ?)",
                 (update["post_id"], "INFO", "RSS article version updated from grouped editor."),
             )
+
+
+def delete_rss_group(rss_item_id):
+    with get_connection() as conn:
+        post_rows = conn.execute("SELECT id FROM posts WHERE rss_item_id = ?", (rss_item_id,)).fetchall()
+        post_ids = [row["id"] for row in post_rows]
+        media_rows = []
+        if post_ids:
+            placeholders = ",".join("?" for _ in post_ids)
+            media_rows = conn.execute(
+                f"SELECT id FROM media_assets WHERE post_id IN ({placeholders})",
+                post_ids,
+            ).fetchall()
+
+    for media in media_rows:
+        delete_media(media["id"])
+
+    with get_connection() as conn:
+        conn.execute("DELETE FROM posts WHERE rss_item_id = ?", (rss_item_id,))
+        conn.execute("DELETE FROM rss_items WHERE id = ?", (rss_item_id,))
+        conn.execute(
+            "INSERT INTO logs (post_id, level, message) VALUES (?, ?, ?)",
+            (None, "INFO", f"RSS article group #{rss_item_id} deleted."),
+        )

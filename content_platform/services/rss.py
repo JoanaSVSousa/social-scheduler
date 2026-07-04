@@ -200,6 +200,23 @@ def mark_feed_checked(feed_id):
         )
 
 
+def refresh_rss_content_types():
+    with get_connection() as conn:
+        items = conn.execute("SELECT id, url, content_type FROM rss_items").fetchall()
+        for item in items:
+            content_type = classify_content_type(item["url"], fallback=item["content_type"])
+            if content_type == item["content_type"]:
+                continue
+            conn.execute(
+                "UPDATE rss_items SET content_type = ? WHERE id = ?",
+                (content_type, item["id"]),
+            )
+            conn.execute(
+                "UPDATE posts SET source_type = ? WHERE rss_item_id = ?",
+                (content_type, item["id"]),
+            )
+
+
 def _record_feed_check(feed_id, created, skipped, errors):
     with get_connection() as conn:
         conn.execute(
@@ -414,7 +431,8 @@ def _clean_summary(value):
 
 def classify_content_type(url, fallback="Regular"):
     path = _normalize_slug(urlparse(url).path)
-    if re.search(r"(^|[-_/])noticias?($|[-_/])", path) or re.search(r"(^|[-_/])noticia($|[-_/])", path):
+    segments = [segment for segment in re.split(r"[-_/]+", path) if segment]
+    if any(segment in {"noticia", "noticias"} for segment in segments):
         return "News"
     return fallback or "Regular"
 

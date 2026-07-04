@@ -205,6 +205,7 @@ content_automation_platform/
 - AI-generated titles, captions, and hashtags
 - Dashboard monthly calendar view
 - Inline calendar editing with a compact pop-up editor
+- Quick-edit calendar menu for changing a post title, platform, status, and schedule without leaving the month view
 - Drag-and-drop calendar rescheduling for post schedules
 - Analytics for best day, best hour, and platform frequency
 - One-click option to attach the source article image directly to selected post versions

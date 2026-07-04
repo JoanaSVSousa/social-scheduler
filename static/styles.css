@@ -279,6 +279,42 @@ table {
     width: 100%;
 }
 
+.posts-table {
+    min-width: 1320px;
+    table-layout: fixed;
+}
+
+.post-col-title {
+    width: 34%;
+}
+
+.post-col-platform {
+    width: 9%;
+}
+
+.post-col-format {
+    width: 9%;
+}
+
+.post-col-status,
+.post-col-type,
+.post-col-media {
+    width: 7%;
+}
+
+.post-col-schedules {
+    width: 8%;
+}
+
+.post-col-scheduled,
+.post-col-hashtags {
+    width: 9%;
+}
+
+.post-col-actions {
+    width: 10%;
+}
+
 th,
 td {
     border-bottom: 1px solid var(--line);
@@ -298,6 +334,22 @@ td small {
     display: block;
     margin-top: 5px;
     max-width: 420px;
+}
+
+.post-title-cell small {
+    max-width: none;
+}
+
+.post-title-link {
+    display: inline-block;
+    font-size: 1.02rem;
+    line-height: 1.2;
+    margin-bottom: 3px;
+}
+
+.post-excerpt {
+    font-size: 0.88rem;
+    line-height: 1.35;
 }
 
 tr:last-child td {
@@ -459,6 +511,20 @@ textarea {
 .actions {
     display: flex;
     gap: 8px;
+}
+
+.posts-table .actions {
+    align-items: stretch;
+    flex-direction: column;
+}
+
+.posts-table .actions form {
+    margin: 0;
+}
+
+.posts-table .actions .button,
+.posts-table .actions button {
+    width: 100%;
 }
 
 .form {

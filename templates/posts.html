@@ -26,8 +26,20 @@
     <button class="button" type="submit">Filter</button>
 </form>
 
-<div class="table-wrap">
-    <table>
+<div class="table-wrap posts-table-wrap">
+    <table class="posts-table">
+        <colgroup>
+            <col class="post-col-title">
+            <col class="post-col-platform">
+            <col class="post-col-format">
+            <col class="post-col-status">
+            <col class="post-col-type">
+            <col class="post-col-media">
+            <col class="post-col-schedules">
+            <col class="post-col-scheduled">
+            <col class="post-col-hashtags">
+            <col class="post-col-actions">
+        </colgroup>
         <thead>
             <tr>
                 <th>Title</th>
@@ -45,12 +57,14 @@
         <tbody>
             {% for post in posts %}
             <tr>
-                <td>
-                    <strong>{{ post.title }}</strong>
+                <td class="post-title-cell">
                     {% if post.is_rss_group %}
+                    <a class="table-link post-title-link" href="{{ url_for('main.edit_rss_article', rss_item_id=post.rss_item_id) }}">{{ post.title }}</a>
                     <small>RSS article with {{ post.platforms|length }} network version{% if post.platforms|length != 1 %}s{% endif %}</small>
+                    {% else %}
+                    <a class="table-link post-title-link" href="{{ url_for('main.edit_post', post_id=post.id) }}">{{ post.title }}</a>
                     {% endif %}
-                    <small>{{ post.content[:110] }}{% if post.content|length > 110 %}...{% endif %}</small>
+                    <small class="post-excerpt">{{ post.content[:260] }}{% if post.content|length > 260 %}...{% endif %}</small>
                 </td>
                 <td>{{ post.platform }}</td>
                 <td>{{ post.content_format }}</td>
@@ -99,6 +113,10 @@
                 <td class="actions">
                     {% if post.is_rss_group %}
                     <a class="button" href="{{ url_for('main.edit_rss_article', rss_item_id=post.rss_item_id) }}">Edit versions</a>
+                    <form method="post" action="{{ url_for('main.remove_rss_article', rss_item_id=post.rss_item_id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="button danger" type="submit">Delete</button>
+                    </form>
                     {% else %}
                     <a class="button" href="{{ url_for('main.edit_post', post_id=post.id) }}">Edit</a>
                     <form method="post" action="{{ url_for('main.remove_post', post_id=post.id) }}">
