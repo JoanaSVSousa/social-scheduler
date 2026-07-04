@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from html import unescape
 import hashlib
 import os
@@ -15,11 +15,13 @@ from .scheduler import add_log
 
 
 USER_AGENT = "ContentAutomationPlatform/1.0"
+FRESHNESS_WINDOW_HOURS = 2.5
 
 
 def list_feeds():
     with get_connection() as conn:
-        return conn.execute("SELECT * FROM rss_feeds ORDER BY created_at DESC").fetchall()
+        feeds = conn.execute("SELECT * FROM rss_feeds ORDER BY created_at DESC").fetchall()
+    return [_feed_with_health(feed) for feed in feeds]
 
 
 def create_feed(name, url, target_platforms, default_hashtags):
@@ -60,6 +62,7 @@ def check_all_feeds(max_entries_per_feed=None):
             except Exception:
                 pass
             errors.append(message)
+            _record_feed_check(feed["id"], 0, 0, [message])
             continue
         created += result["created"]
         skipped += result["skipped"]
@@ -76,6 +79,7 @@ def check_feed(feed, max_entries_per_feed=None):
         entries = fetch_feed_entries(feed["url"])
     except (URLError, ET.ParseError, TimeoutError, ValueError) as exc:
         errors.append(f"{feed['name']}: {exc}")
+        _record_feed_check(feed["id"], created, skipped, errors)
         return {"created": created, "skipped": skipped, "errors": errors}
 
     platforms = [item.strip() for item in feed["target_platforms"].split(",") if item.strip()]
@@ -103,8 +107,25 @@ def check_feed(feed, max_entries_per_feed=None):
             conn.execute("UPDATE rss_items SET post_id = ? WHERE id = ?", (first_post_id, rss_item_id))
 
         conn.execute(
-            "UPDATE rss_feeds SET last_checked_at = ? WHERE id = ?",
-            (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), feed["id"]),
+            """
+            UPDATE rss_feeds
+            SET last_checked_at = ?,
+                last_check_status = ?,
+                last_check_message = ?,
+                last_created_count = ?,
+                last_skipped_count = ?,
+                last_error_count = ?
+            WHERE id = ?
+            """,
+            (
+                _now_string(),
+                _status_for_errors(errors),
+                _message_for_result(created, skipped, errors),
+                created,
+                skipped,
+                len(errors),
+                feed["id"],
+            ),
         )
     return {"created": created, "skipped": skipped, "errors": errors}
 
@@ -140,8 +161,77 @@ def mark_feed_checked(feed_id):
     with get_connection() as conn:
         conn.execute(
             "UPDATE rss_feeds SET last_checked_at = ? WHERE id = ?",
-            (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), feed_id),
+            (_now_string(), feed_id),
         )
+
+
+def _record_feed_check(feed_id, created, skipped, errors):
+    with get_connection() as conn:
+        conn.execute(
+            """
+            UPDATE rss_feeds
+            SET last_checked_at = ?,
+                last_check_status = ?,
+                last_check_message = ?,
+                last_created_count = ?,
+                last_skipped_count = ?,
+                last_error_count = ?
+            WHERE id = ?
+            """,
+            (
+                _now_string(),
+                _status_for_errors(errors),
+                _message_for_result(created, skipped, errors),
+                created,
+                skipped,
+                len(errors),
+                feed_id,
+            ),
+        )
+
+
+def _feed_with_health(feed):
+    feed_data = dict(feed)
+    status = feed_data.get("last_check_status") or "Never checked"
+    checked_at = _parse_check_time(feed_data.get("last_checked_at"))
+
+    if status == "Error":
+        badge = "Error"
+    elif checked_at is None:
+        badge = "Never checked"
+    elif datetime.now() - checked_at > timedelta(hours=FRESHNESS_WINDOW_HOURS):
+        badge = "Needs check"
+    else:
+        badge = "Up to date"
+
+    feed_data["health_badge"] = badge
+    feed_data["health_class"] = badge.lower().replace(" ", "-")
+    return feed_data
+
+
+def _status_for_errors(errors):
+    return "Error" if errors else "OK"
+
+
+def _message_for_result(created, skipped, errors):
+    if errors:
+        return errors[0]
+    return f"{created} draft(s) created, {skipped} item(s) skipped."
+
+
+def _now_string():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _parse_check_time(value):
+    if not value:
+        return None
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M"):
+        try:
+            return datetime.strptime(value, fmt)
+        except ValueError:
+            continue
+    return None
 
 
 def _item_exists(conn, feed_id, guid):

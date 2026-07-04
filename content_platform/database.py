@@ -50,6 +50,11 @@ CREATE TABLE IF NOT EXISTS rss_feeds (
     content_type TEXT NOT NULL DEFAULT 'Regular',
     is_active INTEGER NOT NULL DEFAULT 1,
     last_checked_at TEXT,
+    last_check_status TEXT NOT NULL DEFAULT 'Never checked',
+    last_check_message TEXT DEFAULT '',
+    last_created_count INTEGER NOT NULL DEFAULT 0,
+    last_skipped_count INTEGER NOT NULL DEFAULT 0,
+    last_error_count INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -122,6 +127,11 @@ CREATE TABLE IF NOT EXISTS rss_feeds (
     content_type TEXT NOT NULL DEFAULT 'Regular',
     is_active INTEGER NOT NULL DEFAULT 1,
     last_checked_at TEXT,
+    last_check_status TEXT NOT NULL DEFAULT 'Never checked',
+    last_check_message TEXT DEFAULT '',
+    last_created_count INTEGER NOT NULL DEFAULT 0,
+    last_skipped_count INTEGER NOT NULL DEFAULT 0,
+    last_error_count INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -201,6 +211,11 @@ def init_db(db_path=None):
         _ensure_column(conn, "posts", "rss_item_id", "INTEGER")
         _ensure_column(conn, "posts", "source_type", "TEXT NOT NULL DEFAULT 'Regular'")
         _ensure_column(conn, "rss_feeds", "content_type", "TEXT NOT NULL DEFAULT 'Regular'")
+        _ensure_column(conn, "rss_feeds", "last_check_status", "TEXT NOT NULL DEFAULT 'Never checked'")
+        _ensure_column(conn, "rss_feeds", "last_check_message", "TEXT DEFAULT ''")
+        _ensure_column(conn, "rss_feeds", "last_created_count", "INTEGER NOT NULL DEFAULT 0")
+        _ensure_column(conn, "rss_feeds", "last_skipped_count", "INTEGER NOT NULL DEFAULT 0")
+        _ensure_column(conn, "rss_feeds", "last_error_count", "INTEGER NOT NULL DEFAULT 0")
         _ensure_column(conn, "rss_items", "content_type", "TEXT NOT NULL DEFAULT 'Regular'")
 
 

@@ -553,10 +553,46 @@ label {
     gap: 5px;
 }
 
+.feed-card-title {
+    align-items: center;
+    display: flex !important;
+    gap: 10px;
+    justify-content: space-between;
+}
+
 .feed-card span,
 .feed-card small {
     color: var(--muted);
     overflow-wrap: anywhere;
+}
+
+.health-badge {
+    border-radius: 999px;
+    display: inline-flex;
+    font-size: 0.72rem;
+    font-weight: 900;
+    padding: 5px 9px;
+    white-space: nowrap;
+}
+
+.health-badge.up-to-date {
+    background: rgba(93, 240, 167, 0.14);
+    color: var(--green);
+}
+
+.health-badge.needs-check {
+    background: rgba(255, 209, 102, 0.14);
+    color: var(--yellow);
+}
+
+.health-badge.error {
+    background: rgba(255, 107, 138, 0.14);
+    color: var(--red);
+}
+
+.health-badge.never-checked {
+    background: rgba(185, 171, 201, 0.14);
+    color: var(--muted);
 }
 
 .source-panel {
