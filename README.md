@@ -203,7 +203,9 @@ content_automation_platform/
 - Instagram, Facebook, LinkedIn, X, Threads, Bluesky, TikTok, and YouTube API integrations
 - Retry system for failed publications
 - AI-generated titles, captions, and hashtags
-- Calendar view
+- Dashboard monthly calendar view
+- Inline calendar editing with a compact pop-up editor
+- Drag-and-drop calendar rescheduling for post schedules
 - Analytics for best day, best hour, and platform frequency
 - One-click option to attach the source article image directly to selected post versions
 - Persistent media storage through Supabase Storage or S3

@@ -1,3 +1,4 @@
+from calendar import Calendar, month_name
 from datetime import datetime, timedelta
 from urllib.parse import urlparse
 
@@ -37,13 +38,17 @@ bp = Blueprint("main", __name__)
 @bp.route("/")
 def dashboard():
     posts = get_all_posts()
-    media_by_post = get_media_for_posts([post["id"] for post in posts[:8]])
-    schedules_by_post = get_schedules_for_posts([post["id"] for post in posts[:8]])
+    post_ids = [post["id"] for post in posts]
+    media_by_post = get_media_for_posts(post_ids)
+    schedules_by_post = get_schedules_for_posts(post_ids)
+    post_rows = _aggregate_posts_for_library(posts, media_by_post, schedules_by_post)
+    calendar_context = _build_dashboard_calendar(posts, schedules_by_post)
     return render_template(
         "dashboard.html",
-        posts=posts[:8],
+        posts=post_rows[:8],
         media_by_post=media_by_post,
         schedules_by_post=schedules_by_post,
+        calendar_context=calendar_context,
         status_counts=build_status_counts(posts),
         platform_counts=build_platform_counts(posts),
     )
@@ -116,6 +121,111 @@ def _aggregate_posts_for_library(posts, media_by_post, schedules_by_post):
         rows.append(group)
 
     return rows
+
+
+def _build_dashboard_calendar(posts, schedules_by_post):
+    today = datetime.now()
+    year = _int_arg("year", today.year)
+    month = _int_arg("month", today.month)
+    if month < 1 or month > 12:
+        year = today.year
+        month = today.month
+
+    previous_month = month - 1
+    previous_year = year
+    if previous_month == 0:
+        previous_month = 12
+        previous_year -= 1
+
+    next_month = month + 1
+    next_year = year
+    if next_month == 13:
+        next_month = 1
+        next_year += 1
+
+    events_by_day = _calendar_events_for_month(posts, schedules_by_post, year, month)
+    weeks = []
+    for week in Calendar(firstweekday=0).monthdatescalendar(year, month):
+        weeks.append(
+            [
+                {
+                    "date": day,
+                    "day": day.day,
+                    "is_current_month": day.month == month,
+                    "events": events_by_day.get(day.strftime("%Y-%m-%d"), []),
+                }
+                for day in week
+            ]
+        )
+
+    return {
+        "label": f"{month_name[month]} {year}",
+        "weeks": weeks,
+        "previous": {"year": previous_year, "month": previous_month},
+        "next": {"year": next_year, "month": next_month},
+    }
+
+
+def _calendar_events_for_month(posts, schedules_by_post, year, month):
+    events = {}
+    seen = {}
+    for post in posts:
+        date_values = []
+        if post["scheduled_at"]:
+            date_values.append(post["scheduled_at"])
+        date_values.extend(item["scheduled_at"] for item in schedules_by_post.get(post["id"], []))
+
+        for scheduled_at in date_values:
+            event_dt = _parse_calendar_datetime(scheduled_at)
+            if event_dt is None or event_dt.year != year or event_dt.month != month:
+                continue
+
+            group_key = post["rss_item_id"] or post["id"]
+            event_key = (group_key, scheduled_at)
+            existing = seen.get(event_key)
+            if existing:
+                if post["platform"] not in existing["platforms"]:
+                    existing["platforms"].append(post["platform"])
+                    existing["platform"] = ", ".join(sorted(existing["platforms"]))
+                continue
+
+            event = {
+                "title": post["title"],
+                "time": event_dt.strftime("%H:%M"),
+                "platform": post["platform"],
+                "platforms": [post["platform"]],
+                "status": post["status"],
+                "url": _edit_url_for_post(post),
+            }
+            seen[event_key] = event
+            events.setdefault(event_dt.strftime("%Y-%m-%d"), []).append(event)
+
+    for day_events in events.values():
+        day_events.sort(key=lambda event: event["time"])
+
+    return events
+
+
+def _parse_calendar_datetime(value):
+    for fmt in ("%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(value, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def _edit_url_for_post(post):
+    if post["rss_item_id"]:
+        return url_for("main.edit_rss_article", rss_item_id=post["rss_item_id"])
+    return url_for("main.edit_post", post_id=post["id"])
+
+
+def _int_arg(name, fallback):
+    try:
+        return int(request.args.get(name, fallback))
+    except (TypeError, ValueError):
+        return fallback
 
 
 @bp.route("/rss/articles")

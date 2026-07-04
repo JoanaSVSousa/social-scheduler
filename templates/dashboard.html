@@ -21,7 +21,66 @@
     {% endfor %}
 </section>
 
-<section class="grid two">
+<section class="dashboard-platforms">
+    <div class="section-title">
+        <div>
+            <h2>Platforms</h2>
+            <p class="muted">Connect accounts here when API publishing is enabled.</p>
+        </div>
+    </div>
+    <div class="platform-list platform-list-wide">
+        {% for platform, count in platform_counts.items() %}
+        <div>
+            <span>{{ platform }}</span>
+            <strong>{{ count }}</strong>
+            <button class="button" type="button" disabled>Connect account</button>
+        </div>
+        {% else %}
+        <p>No platform data yet.</p>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="calendar-panel">
+    <div class="section-title">
+        <div>
+            <p class="eyebrow">Monthly Planning</p>
+            <h2>{{ calendar_context.label }}</h2>
+        </div>
+        <div class="actions">
+            <a class="button" href="{{ url_for('main.dashboard', year=calendar_context.previous.year, month=calendar_context.previous.month) }}">Previous</a>
+            <a class="button" href="{{ url_for('main.dashboard', year=calendar_context.next.year, month=calendar_context.next.month) }}">Next</a>
+            <a class="button primary" href="{{ url_for('main.new_post') }}">New Post</a>
+        </div>
+    </div>
+
+    <div class="calendar-grid">
+        {% for label in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] %}
+        <div class="calendar-weekday">{{ label }}</div>
+        {% endfor %}
+        {% for week in calendar_context.weeks %}
+        {% for day in week %}
+        <article class="calendar-day {% if not day.is_current_month %}outside-month{% endif %}">
+            <div class="calendar-day-number">{{ day.day }}</div>
+            <div class="calendar-events">
+                {% for event in day.events[:4] %}
+                <a class="calendar-event status-border-{{ event.status|lower }}" href="{{ event.url }}">
+                    <span>{{ event.time }}</span>
+                    <strong>{{ event.title }}</strong>
+                    <small>{{ event.platform }}</small>
+                </a>
+                {% endfor %}
+                {% if day.events|length > 4 %}
+                <span class="calendar-more">+{{ day.events|length - 4 }} more</span>
+                {% endif %}
+            </div>
+        </article>
+        {% endfor %}
+        {% endfor %}
+    </div>
+</section>
+
+<section>
     <div>
         <div class="section-title">
             <h2>Upcoming Queue</h2>
@@ -43,17 +102,32 @@
                 <tbody>
                     {% for post in posts %}
                     <tr>
-                        <td>{{ post.title }}</td>
+                        <td>
+                            {% if post.is_rss_group %}
+                            <a class="table-link" href="{{ url_for('main.edit_rss_article', rss_item_id=post.rss_item_id) }}">{{ post.title }}</a>
+                            <small>RSS article with {{ post.platforms|length }} network version{% if post.platforms|length != 1 %}s{% endif %}</small>
+                            {% else %}
+                            <a class="table-link" href="{{ url_for('main.edit_post', post_id=post.id) }}">{{ post.title }}</a>
+                            {% endif %}
+                        </td>
                         <td>{{ post.platform }}</td>
                         <td>{{ post.content_format }}</td>
                         <td><span class="status {{ post.status|lower }}">{{ post.status }}</span></td>
                         <td>
+                            {% if post.is_rss_group %}
+                            <span class="media-count">{{ post.media_total }} file{% if post.media_total != 1 %}s{% endif %}</span>
+                            {% else %}
                             {% set media_count = media_by_post.get(post.id, [])|length %}
                             <span class="media-count">{{ media_count }} file{% if media_count != 1 %}s{% endif %}</span>
+                            {% endif %}
                         </td>
                         <td>
+                            {% if post.is_rss_group %}
+                            <span class="media-count">{{ post.schedule_total }} date{% if post.schedule_total != 1 %}s{% endif %}</span>
+                            {% else %}
                             {% set schedule_count = schedules_by_post.get(post.id, [])|length %}
                             <span class="media-count">{{ schedule_count }} date{% if schedule_count != 1 %}s{% endif %}</span>
+                            {% endif %}
                         </td>
                         <td>{{ post.scheduled_at or "Not scheduled" }}</td>
                     </tr>
@@ -62,19 +136,6 @@
                     {% endfor %}
                 </tbody>
             </table>
-        </div>
-    </div>
-
-    <div>
-        <div class="section-title">
-            <h2>Platforms</h2>
-        </div>
-        <div class="platform-list">
-            {% for platform, count in platform_counts.items() %}
-            <div><span>{{ platform }}</span><strong>{{ count }}</strong></div>
-            {% else %}
-            <p>No platform data yet.</p>
-            {% endfor %}
         </div>
     </div>
 </section>
