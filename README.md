@@ -16,6 +16,8 @@ This project is designed as an automation-focused academic project that can run 
 - Modular architecture prepared for future API publishers, retries, AI suggestions, and analytics
 - Protected RSS intake that turns new feed items into draft posts
 - Recycled posts with multiple schedule dates
+- Grouped RSS article editor for adapting copy, formats, schedules, and media per social network
+- RSS duplicate protection by source URL, useful when a general feed overlaps with category feeds
 
 ## Tech Stack
 
@@ -120,6 +122,20 @@ Recommended schedule:
 0 */2 * * *
 ```
 
+## RSS Media Workflow
+
+RSS imports store the source article image URL when the feed exposes one through RSS media tags, image enclosures, or the article summary HTML.
+
+In `Posts`, RSS articles are grouped into one row. Use `Edit versions` to adapt each network version on one page:
+
+- choose the networks for that article;
+- edit copy and format per platform;
+- add recycling dates;
+- upload images or videos per network version;
+- use the source article image preview as a reference for media selection.
+
+Current production note: uploaded media is stored in `static/uploads`. For serious team usage on Render, move this to persistent object storage such as Supabase Storage or S3.
+
 ## Email Dashboard Report
 
 Send a dashboard-style email report with upcoming posts, recycled schedules, platform counts, and recent logs:
@@ -189,3 +205,5 @@ content_automation_platform/
 - AI-generated titles, captions, and hashtags
 - Calendar view
 - Analytics for best day, best hour, and platform frequency
+- One-click option to attach the source article image directly to selected post versions
+- Persistent media storage through Supabase Storage or S3

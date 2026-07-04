@@ -113,12 +113,21 @@ def check_feed(feed, max_entries_per_feed=None):
     with get_connection() as conn:
         for entry in entries[:max_entries]:
             guid = entry["guid"]
-            if _item_exists(conn, feed["id"], guid):
+            if _item_exists(conn, feed["id"], guid) or _url_exists(conn, entry["link"]):
                 skipped += 1
                 continue
 
             content_type = classify_content_type(entry["link"], fallback=feed["content_type"])
-            rss_item_id = _remember_item(conn, feed["id"], guid, entry["title"], entry["link"], content_type, None)
+            rss_item_id = _remember_item(
+                conn,
+                feed["id"],
+                guid,
+                entry["title"],
+                entry["link"],
+                entry.get("image_url", ""),
+                content_type,
+                None,
+            )
             first_post_id = None
             for platform in platforms:
                 post_id = _create_rss_draft(conn, feed, entry, platform, rss_item_id, content_type)
@@ -173,9 +182,9 @@ def item_exists(feed_id, guid):
         return _item_exists(conn, feed_id, guid)
 
 
-def remember_item(feed_id, guid, title, url, content_type, post_id):
+def remember_item(feed_id, guid, title, url, image_url, content_type, post_id):
     with get_connection() as conn:
-        return _remember_item(conn, feed_id, guid, title, url, content_type, post_id)
+        return _remember_item(conn, feed_id, guid, title, url, image_url, content_type, post_id)
 
 
 def update_item_post(rss_item_id, post_id):
@@ -268,7 +277,25 @@ def _item_exists(conn, feed_id, guid):
     return row is not None
 
 
-def _remember_item(conn, feed_id, guid, title, url, content_type, post_id):
+def _url_exists(conn, url):
+    variants = _url_variants(url)
+    placeholders = ",".join("?" for _ in variants)
+    row = conn.execute(f"SELECT id FROM rss_items WHERE url IN ({placeholders})", variants).fetchone()
+    return row is not None
+
+
+def _url_variants(url):
+    clean_url = (url or "").strip()
+    without_trailing_slash = clean_url.rstrip("/")
+    variants = [clean_url]
+    if without_trailing_slash and without_trailing_slash != clean_url:
+        variants.append(without_trailing_slash)
+    elif clean_url:
+        variants.append(clean_url + "/")
+    return variants
+
+
+def _remember_item(conn, feed_id, guid, title, url, image_url, content_type, post_id):
     row = conn.execute(
         "SELECT id FROM rss_items WHERE feed_id = ? AND item_guid = ?",
         (feed_id, guid),
@@ -278,10 +305,10 @@ def _remember_item(conn, feed_id, guid, title, url, content_type, post_id):
     return insert_and_get_id(
         conn,
         """
-        INSERT INTO rss_items (feed_id, item_guid, title, url, content_type, post_id)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO rss_items (feed_id, item_guid, title, url, image_url, content_type, post_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
-        (feed_id, guid, title, url, content_type, post_id),
+        (feed_id, guid, title, url, image_url, content_type, post_id),
     )
 
 
@@ -308,13 +335,15 @@ def _create_rss_draft(conn, feed, entry, platform, rss_item_id, content_type):
 
 def _parse_rss(root):
     entries = []
+    media_ns = {"media": "http://search.yahoo.com/mrss/"}
     for item in root.findall(".//item"):
         title = _text(item, "title")
         link = _text(item, "link")
         guid = _text(item, "guid") or link or _hash(title)
         summary = _text(item, "description")
+        image_url = _rss_image_url(item, summary, media_ns)
         if title and link:
-            entries.append({"title": title, "link": link, "guid": guid, "summary": summary})
+            entries.append({"title": title, "link": link, "guid": guid, "summary": summary, "image_url": image_url})
     return entries
 
 
@@ -327,9 +356,29 @@ def _parse_atom(root):
         link = link_el.attrib.get("href", "") if link_el is not None else ""
         guid = _text(item, "atom:id", ns) or link or _hash(title)
         summary = _text(item, "atom:summary", ns) or _text(item, "atom:content", ns)
+        image_url = _first_image_from_html(summary)
         if title and link:
-            entries.append({"title": title, "link": link, "guid": guid, "summary": summary})
+            entries.append({"title": title, "link": link, "guid": guid, "summary": summary, "image_url": image_url})
     return entries
+
+
+def _rss_image_url(item, summary, media_ns):
+    media = item.find("media:content", media_ns)
+    if media is None:
+        media = item.find("media:thumbnail", media_ns)
+    if media is not None and media.attrib.get("url"):
+        return media.attrib["url"].strip()
+    enclosure = item.find("enclosure")
+    if enclosure is not None and enclosure.attrib.get("type", "").startswith("image/"):
+        return enclosure.attrib.get("url", "").strip()
+    return _first_image_from_html(summary)
+
+
+def _first_image_from_html(value):
+    if not value:
+        return ""
+    match = re.search(r"<img[^>]+src=[\"']([^\"']+)[\"']", value, re.IGNORECASE)
+    return unescape(match.group(1)).strip() if match else ""
 
 
 def _draft_content(entry):

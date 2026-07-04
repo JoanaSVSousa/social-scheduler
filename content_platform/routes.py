@@ -168,16 +168,21 @@ def edit_rss_article(rss_item_id):
             if prefix + "title" not in request.form:
                 continue
             replace_schedules(post["id"], _schedule_dates_from_prefixed_form(prefix))
+            saved, skipped = save_media_files(post["id"], request.files.getlist(prefix + "media_files"))
+            _flash_media_result(saved, skipped)
         flash("Article versions updated.", "success")
         return redirect(url_for("main.edit_rss_article", rss_item_id=rss_item_id))
 
     schedules_by_post = get_schedules_for_posts([post["id"] for post in posts])
+    media_by_post = get_media_for_posts([post["id"] for post in posts])
     return render_template(
         "rss_article_edit.html",
         item=item,
         posts=posts,
         schedules_by_post=schedules_by_post,
+        media_by_post=media_by_post,
         content_formats=PLATFORM_CONTENT_FORMATS,
+        media_guides=PLATFORM_MEDIA_GUIDES,
         statuses=STATUSES,
         platforms=PLATFORMS,
     )

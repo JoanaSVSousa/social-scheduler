@@ -13,9 +13,15 @@
     <strong>{{ item.title }}</strong>
     <small><span class="type-pill {{ item.content_type|lower }}">{{ item.content_type }}</span></small>
     <span>{{ item.url }}</span>
+    {% if item.image_url %}
+    <div class="source-media-preview">
+        <img src="{{ item.image_url }}" alt="">
+        <small>Source image from article. Use it as reference or upload it to the versions that need media.</small>
+    </div>
+    {% endif %}
 </section>
 
-<form method="post" class="version-editor">
+<form method="post" class="version-editor" enctype="multipart/form-data">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
     <section class="source-panel">
@@ -39,6 +45,7 @@
     {% for post in posts %}
     {% set prefix = "post_" ~ post.id ~ "_" %}
     {% set schedule_items = schedules_by_post.get(post.id, []) %}
+    {% set media_items = media_by_post.get(post.id, []) %}
     <article class="version-card">
         <div class="version-card-header">
             <div>
@@ -108,6 +115,25 @@
                 <input type="number" name="{{ prefix }}repeat_interval_days" min="1" max="365" placeholder="14">
             </label>
         </div>
+
+        <section class="media-panel">
+            <div>
+                <strong>Media for {{ post.platform }}</strong>
+                <p>{{ media_guides.get(post.platform, "Attach the media required by this platform.") }}</p>
+            </div>
+            <label class="upload-box">
+                Upload media
+                <input type="file" name="{{ prefix }}media_files" multiple accept="image/*,video/*">
+                <span>Images and videos attached here only apply to this network version.</span>
+            </label>
+            {% if media_items %}
+            <div class="media-strip">
+                {% for item in media_items %}
+                <span class="media-pill">{{ item.media_type }} · {{ item.original_filename }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </section>
     </article>
     {% endfor %}
 

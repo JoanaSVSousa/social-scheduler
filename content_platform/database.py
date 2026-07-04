@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS rss_items (
     item_guid TEXT NOT NULL,
     title TEXT NOT NULL,
     url TEXT NOT NULL,
+    image_url TEXT DEFAULT '',
     content_type TEXT NOT NULL DEFAULT 'Regular',
     post_id INTEGER,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -141,6 +142,7 @@ CREATE TABLE IF NOT EXISTS rss_items (
     item_guid TEXT NOT NULL,
     title TEXT NOT NULL,
     url TEXT NOT NULL,
+    image_url TEXT DEFAULT '',
     content_type TEXT NOT NULL DEFAULT 'Regular',
     post_id INTEGER,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -217,6 +219,7 @@ def init_db(db_path=None):
         _ensure_column(conn, "rss_feeds", "last_skipped_count", "INTEGER NOT NULL DEFAULT 0")
         _ensure_column(conn, "rss_feeds", "last_error_count", "INTEGER NOT NULL DEFAULT 0")
         _ensure_column(conn, "rss_items", "content_type", "TEXT NOT NULL DEFAULT 'Regular'")
+        _ensure_column(conn, "rss_items", "image_url", "TEXT DEFAULT ''")
 
 
 def _ensure_column(conn, table_name, column_name, column_definition):

@@ -627,6 +627,27 @@ label {
     overflow-wrap: anywhere;
 }
 
+.source-media-preview {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    display: grid;
+    gap: 12px;
+    grid-template-columns: 112px 1fr;
+    margin-top: 4px;
+    padding: 10px;
+}
+
+.source-media-preview img {
+    aspect-ratio: 16 / 10;
+    background: #050812;
+    border-radius: 8px;
+    display: block;
+    object-fit: cover;
+    width: 100%;
+}
+
 .version-editor {
     display: grid;
     gap: 18px;
@@ -738,7 +759,8 @@ label {
     .metrics,
     .grid.two,
     .filters,
-    .form-row {
+    .form-row,
+    .source-media-preview {
         grid-template-columns: 1fr;
     }
 
