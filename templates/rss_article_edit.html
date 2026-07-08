@@ -43,34 +43,115 @@
     </section>
 
     {% if posts %}
-    <section class="source-panel shared-copy-panel">
-        <div>
-            <strong>General copy</strong>
-            <small>Used by every selected network unless you open a network tab and customize its copy.</small>
-        </div>
-        <textarea id="shared-copy" rows="4">{{ posts[0].content }}</textarea>
-        <button class="button" type="button" id="apply-shared-copy">Apply copy to all network versions</button>
-    </section>
-
     <nav class="network-jump-list" aria-label="Network versions">
+        <button class="network-jump active" type="button" data-target-version="version-general">
+            <span>G</span>
+            General
+        </button>
         {% for post in posts %}
-        <button class="network-jump {% if loop.first %}active{% endif %}" type="button" data-target-version="version-{{ post.id }}">
+        {% set overrides = editor_meta.get(post.id, {}).get("overrides", {}) %}
+        <button class="network-jump {% if overrides.values()|select|list %}has-overrides{% endif %}" type="button" data-target-version="version-{{ post.id }}">
             <span>{{ post.platform[:1] }}</span>
             {{ post.platform }}
         </button>
         {% endfor %}
     </nav>
+
+    <article class="version-card general-version-card" id="version-general" data-general-card>
+        <div class="version-card-header">
+            <div>
+                <p class="eyebrow">Default settings</p>
+                <h2>General version</h2>
+            </div>
+            <span class="status draft">Inherited by default</span>
+        </div>
+
+        <div class="version-fields">
+            <label>
+                Title
+                <input data-general-field="title" name="general_title" maxlength="120" required value="{{ general_defaults.title }}">
+            </label>
+
+            <label>
+                Content
+                <textarea data-general-field="content" name="general_content" rows="7" maxlength="2200" required>{{ general_defaults.content }}</textarea>
+                <span class="field-help">Network tabs inherit this copy until that specific field is edited there.</span>
+            </label>
+
+            <div class="form-row compact-controls schedule-row">
+                <label>
+                    Status
+                    <select data-general-field="status" name="general_status">
+                        {% for status in statuses %}
+                        <option value="{{ status }}" {% if general_defaults.status == status %}selected{% endif %}>{{ status }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label>
+                    Main scheduled date
+                    <input data-general-field="scheduled_date" type="date" name="general_scheduled_date" value="{{ general_defaults.scheduled_parts.date }}">
+                </label>
+                <label>
+                    Main scheduled time
+                    <input data-general-field="scheduled_time" type="time" name="general_scheduled_time" value="{{ general_defaults.scheduled_parts.time }}">
+                </label>
+                <label>
+                    Hashtags
+                    <input data-general-field="hashtags" name="general_hashtags" maxlength="400" value="{{ general_defaults.hashtags }}">
+                </label>
+            </div>
+
+            <label>
+                Recycling dates
+                <textarea data-general-field="schedule_dates" name="general_schedule_dates" rows="4" placeholder="2026-07-10T18:00&#10;2026-07-24T18:00">{{ general_defaults.schedule_text }}</textarea>
+            </label>
+
+            <div class="form-row">
+                <label>
+                    Repeat from date
+                    <input type="date" name="general_repeat_date">
+                </label>
+                <label>
+                    Repeat from time
+                    <input type="time" name="general_repeat_time">
+                </label>
+                <label>
+                    Times
+                    <input type="number" name="general_repeat_count" min="1" max="24" placeholder="4">
+                </label>
+                <label>
+                    Every N days
+                    <input type="number" name="general_repeat_interval_days" min="1" max="365" placeholder="14">
+                </label>
+            </div>
+
+            <section class="media-panel">
+                <div>
+                    <strong>General media</strong>
+                    <p>Files uploaded here are attached to every selected network version, as long as that network format accepts the media type.</p>
+                </div>
+                <label class="upload-box">
+                    Upload media for all networks
+                    <input data-general-media-input type="file" name="general_media_files" multiple accept="image/*,video/*">
+                    <span>Use network tabs only when one platform needs a different asset.</span>
+                </label>
+                <div class="media-strip" data-general-media-list></div>
+            </section>
+        </div>
+    </article>
     {% endif %}
 
     {% for post in posts %}
     {% set prefix = "post_" ~ post.id ~ "_" %}
     {% set schedule_items = schedules_by_post.get(post.id, []) %}
+    {% set meta = editor_meta.get(post.id, {}) %}
+    {% set overrides = meta.get("overrides", {}) %}
     {% set media_items = media_by_post.get(post.id, []) %}
     {% set scheduled_parts = datetime_parts(post.scheduled_at) %}
     {% set repeat_parts = datetime_parts('') %}
     {% set current_rule = format_rules.get(post.content_format, {}) %}
     {% set current_allowed = current_rule.get("allowed_media_types", []) %}
-    <article class="version-card {% if not loop.first %}is-hidden{% endif %}" id="version-{{ post.id }}" data-version-card data-platform="{{ post.platform }}">
+    <article class="version-card is-hidden" id="version-{{ post.id }}" data-version-card data-platform="{{ post.platform }}">
         <div class="version-card-header">
             <div>
                 <p class="eyebrow">{{ post.platform }}</p>
@@ -82,20 +163,22 @@
         <div class="version-layout">
         <div class="version-fields">
         <label>
-            Title
-            <input data-preview-title name="{{ prefix }}title" maxlength="120" required value="{{ post.title }}">
+            <span class="field-label-with-tabs">
+                Title
+                <span class="inheritance-state" data-inheritance-state="title">{% if overrides.title %}Custom {{ post.platform }}{% else %}General{% endif %}</span>
+            </span>
+            <input type="hidden" name="{{ prefix }}override_title" value="{% if overrides.title %}1{% else %}0{% endif %}" data-override-flag="title">
+            <input data-preview-title data-network-field="title" name="{{ prefix }}title" maxlength="120" required value="{{ post.title }}">
         </label>
 
         <label>
             <span class="field-label-with-tabs">
                 Content
-                <span class="network-mini-tabs">
-                    <button class="mini-tab active" type="button" data-use-general-copy>General</button>
-                    <button class="mini-tab" type="button" data-custom-copy>Custom {{ post.platform }}</button>
-                </span>
+                <span class="inheritance-state" data-inheritance-state="content">{% if overrides.content %}Custom {{ post.platform }}{% else %}General{% endif %}</span>
             </span>
-            <textarea data-preview-content name="{{ prefix }}content" rows="8" maxlength="2200" required>{{ post.content }}</textarea>
-            <span class="field-help" data-copy-state>Using the general copy unless edited here.</span>
+            <input type="hidden" name="{{ prefix }}override_content" value="{% if overrides.content %}1{% else %}0{% endif %}" data-override-flag="content">
+            <textarea data-preview-content data-network-field="content" name="{{ prefix }}content" rows="8" maxlength="2200" required>{{ post.content }}</textarea>
+            <span class="field-help">Only this field becomes custom when you edit it in this network tab.</span>
         </label>
 
         <div class="form-row compact-controls">
@@ -108,8 +191,12 @@
                 </select>
             </label>
             <label>
-                Status
-                <select data-preview-status name="{{ prefix }}status">
+                <span class="field-label-with-tabs">
+                    Status
+                    <span class="inheritance-state" data-inheritance-state="status">{% if overrides.status %}Custom {{ post.platform }}{% else %}General{% endif %}</span>
+                </span>
+                <input type="hidden" name="{{ prefix }}override_status" value="{% if overrides.status %}1{% else %}0{% endif %}" data-override-flag="status">
+                <select data-preview-status data-network-field="status" name="{{ prefix }}status">
                     {% for status in statuses %}
                     <option value="{{ status }}" {% if post.status == status %}selected{% endif %}>{{ status }}</option>
                     {% endfor %}
@@ -119,43 +206,52 @@
 
         <div class="form-row compact-controls schedule-row">
             <label>
-                Main scheduled date
-                <input type="date" name="{{ prefix }}scheduled_date" value="{{ scheduled_parts.date }}">
+                <span class="field-label-with-tabs">
+                    Main scheduled date
+                    <span class="inheritance-state" data-inheritance-state="schedule">{% if overrides.schedule %}Custom {{ post.platform }}{% else %}General{% endif %}</span>
+                </span>
+                <input type="hidden" name="{{ prefix }}override_schedule" value="{% if overrides.schedule %}1{% else %}0{% endif %}" data-override-flag="schedule">
+                <input data-network-field="scheduled_date" data-schedule-field type="date" name="{{ prefix }}scheduled_date" value="{{ scheduled_parts.date }}">
             </label>
             <label>
                 Main scheduled time
-                <input type="time" name="{{ prefix }}scheduled_time" value="{{ scheduled_parts.time }}">
+                <input data-network-field="scheduled_time" data-schedule-field type="time" name="{{ prefix }}scheduled_time" value="{{ scheduled_parts.time }}">
             </label>
             <label>
-                Hashtags
-                <input data-preview-hashtags name="{{ prefix }}hashtags" maxlength="400" value="{{ post.hashtags }}">
+                <span class="field-label-with-tabs">
+                    Hashtags
+                    <span class="inheritance-state" data-inheritance-state="hashtags">{% if overrides.hashtags %}Custom {{ post.platform }}{% else %}General{% endif %}</span>
+                </span>
+                <input type="hidden" name="{{ prefix }}override_hashtags" value="{% if overrides.hashtags %}1{% else %}0{% endif %}" data-override-flag="hashtags">
+                <input data-preview-hashtags data-network-field="hashtags" name="{{ prefix }}hashtags" maxlength="400" value="{{ post.hashtags }}">
             </label>
         </div>
 
         <label>
             Recycling dates
-            <textarea name="{{ prefix }}schedule_dates" rows="4" placeholder="2026-07-10T18:00&#10;2026-07-24T18:00">{% for item in schedule_items %}{{ item.scheduled_at }}{% if not loop.last %}
-{% endif %}{% endfor %}</textarea>
+            <textarea data-network-field="schedule_dates" data-schedule-field name="{{ prefix }}schedule_dates" rows="4" placeholder="2026-07-10T18:00&#10;2026-07-24T18:00">{{ meta.get("schedule_text", "") }}</textarea>
         </label>
 
         <div class="form-row">
             <label>
                 Repeat from date
-                <input type="date" name="{{ prefix }}repeat_date" value="{{ repeat_parts.date }}">
+                <input data-schedule-field type="date" name="{{ prefix }}repeat_date" value="{{ repeat_parts.date }}">
             </label>
             <label>
                 Repeat from time
-                <input type="time" name="{{ prefix }}repeat_time" value="{{ repeat_parts.time }}">
+                <input data-schedule-field type="time" name="{{ prefix }}repeat_time" value="{{ repeat_parts.time }}">
             </label>
             <label>
                 Times
-                <input type="number" name="{{ prefix }}repeat_count" min="1" max="24" placeholder="4">
+                <input data-schedule-field type="number" name="{{ prefix }}repeat_count" min="1" max="24" placeholder="4">
             </label>
             <label>
                 Every N days
-                <input type="number" name="{{ prefix }}repeat_interval_days" min="1" max="365" placeholder="14">
+                <input data-schedule-field type="number" name="{{ prefix }}repeat_interval_days" min="1" max="365" placeholder="14">
             </label>
         </div>
+
+        <button class="button compact-reset-button" type="button" data-reset-to-general>Use General defaults in this tab</button>
 
         <section class="media-panel">
             <div>
@@ -230,38 +326,97 @@
 <script>
 const formatRules = {{ format_rules|tojson }};
 
-document.querySelector("#apply-shared-copy")?.addEventListener("click", () => {
-    const sharedCopy = document.querySelector("#shared-copy").value;
-    document.querySelectorAll("[data-preview-content]").forEach((field) => {
-        field.value = sharedCopy;
-        field.dataset.customCopy = "";
-        field.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    document.querySelectorAll("[data-copy-state]").forEach((state) => {
-        state.textContent = "Using general copy.";
-    });
-});
-
-document.querySelector("#shared-copy")?.addEventListener("input", (event) => {
-    document.querySelectorAll("[data-preview-content]").forEach((field) => {
-        if (field.dataset.customCopy === "1") {
-            return;
-        }
-        field.value = event.target.value;
-        field.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-});
-
 document.querySelectorAll("[data-target-version]").forEach((button) => {
     button.addEventListener("click", () => {
         document.querySelectorAll("[data-target-version]").forEach((item) => item.classList.remove("active"));
+        document.querySelector("[data-general-card]")?.classList.add("is-hidden");
         document.querySelectorAll("[data-version-card]").forEach((card) => card.classList.add("is-hidden"));
         button.classList.add("active");
         document.getElementById(button.dataset.targetVersion)?.classList.remove("is-hidden");
     });
 });
 
+const generalFields = {};
+document.querySelectorAll("[data-general-field]").forEach((field) => {
+    generalFields[field.dataset.generalField] = field;
+});
+
+function overrideGroupForField(fieldName) {
+    return ["scheduled_date", "scheduled_time", "schedule_dates"].includes(fieldName) ? "schedule" : fieldName;
+}
+
+function hasOverride(card, fieldName) {
+    return card.querySelector(`[data-override-flag="${fieldName}"]`)?.value === "1";
+}
+
+function setOverride(card, fieldName, enabled) {
+    const flag = card.querySelector(`[data-override-flag="${fieldName}"]`);
+    const state = card.querySelector(`[data-inheritance-state="${fieldName}"]`);
+    if (!flag) {
+        return;
+    }
+
+    flag.value = enabled ? "1" : "0";
+    if (state) {
+        state.textContent = enabled ? `Custom ${card.dataset.platform}` : "General";
+        state.classList.toggle("is-custom", enabled);
+    }
+
+    const tab = document.querySelector(`[data-target-version="${card.id}"]`);
+    if (tab) {
+        const hasAnyOverride = Array.from(card.querySelectorAll("[data-override-flag]")).some((item) => item.value === "1");
+        tab.classList.toggle("has-overrides", hasAnyOverride);
+    }
+}
+
+function syncInheritedFieldsFromGeneral(card) {
+    Object.entries(generalFields).forEach(([fieldName, generalField]) => {
+        const overrideGroup = overrideGroupForField(fieldName);
+        if (hasOverride(card, overrideGroup)) {
+            return;
+        }
+        const networkField = card.querySelector(`[data-network-field="${fieldName}"]`);
+        if (networkField) {
+            networkField.value = generalField.value;
+        }
+    });
+}
+
+function applyGeneralValue(fieldName, value) {
+    document.querySelectorAll(`[data-network-field="${fieldName}"]`).forEach((field) => {
+        const card = field.closest("[data-version-card]");
+        if (!card || hasOverride(card, overrideGroupForField(fieldName))) {
+            return;
+        }
+        field.dataset.syncingGeneral = "1";
+        field.value = value;
+        field.dispatchEvent(new Event("input", { bubbles: true }));
+        field.dispatchEvent(new Event("change", { bubbles: true }));
+        delete field.dataset.syncingGeneral;
+    });
+}
+
+document.querySelectorAll("[data-general-field]").forEach((field) => {
+    field.addEventListener("input", () => applyGeneralValue(field.dataset.generalField, field.value));
+    field.addEventListener("change", () => applyGeneralValue(field.dataset.generalField, field.value));
+});
+
+document.querySelector("[data-general-media-input]")?.addEventListener("change", (event) => {
+    const list = document.querySelector("[data-general-media-list]");
+    if (!list) {
+        return;
+    }
+    list.innerHTML = "";
+    Array.from(event.target.files || []).forEach((file) => {
+        const pill = document.createElement("span");
+        pill.className = "media-pill";
+        pill.textContent = `${file.type.startsWith("video/") ? "video" : "image"} · ${file.name}`;
+        list.appendChild(pill);
+    });
+});
+
 document.querySelectorAll("[data-version-card]").forEach((card) => {
+    syncInheritedFieldsFromGeneral(card);
     const titleInput = card.querySelector("[data-preview-title]");
     const contentInput = card.querySelector("[data-preview-content]");
     const formatInput = card.querySelector("[data-preview-format]");
@@ -276,26 +431,6 @@ document.querySelectorAll("[data-version-card]").forEach((card) => {
     const mediaOutput = card.querySelector("[data-preview-media]");
     const previewCard = card.querySelector("[data-preview-card]");
     const ruleOutput = card.querySelector("[data-format-rule]");
-    const sharedCopy = document.querySelector("#shared-copy");
-    const copyState = card.querySelector("[data-copy-state]");
-    const useGeneralCopyButton = card.querySelector("[data-use-general-copy]");
-    const customCopyButton = card.querySelector("[data-custom-copy]");
-
-    function setCopyMode(mode) {
-        if (mode === "general") {
-            contentInput.dataset.customCopy = "";
-            contentInput.value = sharedCopy.value;
-            copyState.textContent = "Using general copy.";
-            useGeneralCopyButton.classList.add("active");
-            customCopyButton.classList.remove("active");
-            contentInput.dispatchEvent(new Event("input", { bubbles: true }));
-        } else {
-            contentInput.dataset.customCopy = "1";
-            copyState.textContent = `Custom copy for ${card.dataset.platform}.`;
-            useGeneralCopyButton.classList.remove("active");
-            customCopyButton.classList.add("active");
-        }
-    }
 
     function syncPreview() {
         const format = formatInput.value;
@@ -363,17 +498,39 @@ document.querySelectorAll("[data-version-card]").forEach((card) => {
         });
     }
 
+    [titleInput, contentInput, statusInput, hashtagsInput].forEach((input) => {
+        input.addEventListener("input", () => {
+            if (!input.dataset.syncingGeneral) {
+                setOverride(card, overrideGroupForField(input.dataset.networkField), true);
+            }
+        });
+        input.addEventListener("change", () => {
+            if (!input.dataset.syncingGeneral) {
+                setOverride(card, overrideGroupForField(input.dataset.networkField), true);
+            }
+        });
+    });
+    card.querySelectorAll("[data-schedule-field]").forEach((input) => {
+        input.addEventListener("input", () => {
+            if (!input.dataset.syncingGeneral) {
+                setOverride(card, "schedule", true);
+            }
+        });
+        input.addEventListener("change", () => {
+            if (!input.dataset.syncingGeneral) {
+                setOverride(card, "schedule", true);
+            }
+        });
+    });
+    card.querySelector("[data-reset-to-general]")?.addEventListener("click", () => {
+        ["title", "content", "hashtags", "status", "schedule"].forEach((fieldName) => setOverride(card, fieldName, false));
+        syncInheritedFieldsFromGeneral(card);
+        syncPreview();
+    });
     [titleInput, contentInput, formatInput, statusInput, hashtagsInput].forEach((input) => {
         input.addEventListener("input", syncPreview);
         input.addEventListener("change", syncPreview);
     });
-    contentInput.addEventListener("input", () => {
-        if (contentInput.value !== sharedCopy.value && contentInput.dataset.customCopy !== "1") {
-            setCopyMode("custom");
-        }
-    });
-    useGeneralCopyButton.addEventListener("click", () => setCopyMode("general"));
-    customCopyButton.addEventListener("click", () => setCopyMode("custom"));
     mediaInput.addEventListener("change", syncSelectedMediaPreview);
     syncPreview();
 });

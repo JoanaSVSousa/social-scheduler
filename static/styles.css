@@ -928,14 +928,6 @@ label {
     gap: 18px;
 }
 
-.shared-copy-panel {
-    gap: 12px;
-}
-
-.shared-copy-panel .button {
-    justify-self: start;
-}
-
 .network-jump-list {
     align-items: center;
     display: flex;
@@ -954,6 +946,14 @@ label {
     background: rgba(255, 79, 216, 0.16);
     border-color: rgba(255, 79, 216, 0.48);
     color: white;
+}
+
+.network-jump.has-overrides::after {
+    background: var(--accent);
+    border-radius: 999px;
+    content: "";
+    height: 7px;
+    width: 7px;
 }
 
 .network-jump span {
@@ -990,6 +990,12 @@ label {
     justify-content: space-between;
 }
 
+.general-version-card {
+    background:
+        linear-gradient(135deg, rgba(255, 79, 216, 0.08), rgba(70, 220, 255, 0.035)),
+        var(--surface);
+}
+
 .version-layout {
     align-items: start;
     display: grid;
@@ -1015,6 +1021,27 @@ label {
     display: flex;
     gap: 12px;
     justify-content: space-between;
+}
+
+.inheritance-state {
+    background: rgba(70, 220, 255, 0.12);
+    border: 1px solid rgba(70, 220, 255, 0.28);
+    border-radius: 999px;
+    color: #68ecff;
+    font-size: 0.72rem;
+    font-weight: 800;
+    padding: 4px 8px;
+    white-space: nowrap;
+}
+
+.inheritance-state.is-custom {
+    background: rgba(255, 79, 216, 0.16);
+    border-color: rgba(255, 79, 216, 0.38);
+    color: #ff86e5;
+}
+
+.compact-reset-button {
+    justify-self: start;
 }
 
 .network-mini-tabs {

@@ -395,12 +395,24 @@ def edit_rss_article(rss_item_id):
         if not selected_platforms or any(platform not in PLATFORMS for platform in selected_platforms):
             abort(400)
         item, posts = sync_rss_group_platforms(rss_item_id, selected_platforms)
+        general_status = request.form.get("general_status", "Draft")
+        general_values = {
+            "title": request.form.get("general_title", "").strip()[:120],
+            "content": request.form.get("general_content", "").strip()[:2200],
+            "hashtags": request.form.get("general_hashtags", "").strip()[:400],
+            "status": general_status,
+            "scheduled_at": _datetime_from_form("", "general_scheduled"),
+        }
+        if general_status not in STATUSES:
+            abort(400)
+        if not general_values["title"] or not general_values["content"]:
+            abort(400)
+        general_schedule_dates = _schedule_dates_from_general_form()
+        general_media_files = request.files.getlist("general_media_files")
         updates = []
         for post in posts:
             prefix = f"post_{post['id']}_"
-            if prefix + "title" not in request.form:
-                continue
-            status = request.form.get(prefix + "status", post["status"])
+            status = _override_or_general(prefix, "status", post["status"], general_values["status"])
             content_format = request.form.get(prefix + "content_format", post["content_format"])
             if status not in STATUSES:
                 abort(400)
@@ -409,12 +421,12 @@ def edit_rss_article(rss_item_id):
             updates.append(
                 {
                     "post_id": post["id"],
-                    "title": request.form.get(prefix + "title", "").strip()[:120],
-                    "content": request.form.get(prefix + "content", "").strip()[:2200],
-                    "hashtags": request.form.get(prefix + "hashtags", "").strip()[:400],
+                    "title": _override_or_general(prefix, "title", post["title"], general_values["title"], 120),
+                    "content": _override_or_general(prefix, "content", post["content"], general_values["content"], 2200),
+                    "hashtags": _override_or_general(prefix, "hashtags", post["hashtags"], general_values["hashtags"], 400),
                     "content_format": content_format,
                     "status": status,
-                    "scheduled_at": _datetime_from_form(prefix),
+                    "scheduled_at": _datetime_from_form(prefix) if _uses_field_override(prefix, "schedule") else general_values["scheduled_at"],
                 }
             )
             if not updates[-1]["title"] or not updates[-1]["content"]:
@@ -423,10 +435,12 @@ def edit_rss_article(rss_item_id):
         update_rss_group_posts(updates)
         for post in posts:
             prefix = f"post_{post['id']}_"
-            if prefix + "title" not in request.form:
-                continue
-            replace_schedules(post["id"], _schedule_dates_from_prefixed_form(prefix))
             content_format = request.form.get(prefix + "content_format", post["content_format"])
+            schedule_dates = _schedule_dates_from_prefixed_form(prefix) if _uses_field_override(prefix, "schedule") else general_schedule_dates
+            replace_schedules(post["id"], schedule_dates)
+            _reset_file_streams(general_media_files)
+            saved, skipped = save_media_files(post["id"], general_media_files, content_format)
+            _flash_media_result(saved, skipped)
             saved, skipped = save_media_files(
                 post["id"],
                 request.files.getlist(prefix + "media_files"),
@@ -438,10 +452,13 @@ def edit_rss_article(rss_item_id):
 
     schedules_by_post = get_schedules_for_posts([post["id"] for post in posts])
     media_by_post = get_media_for_posts([post["id"] for post in posts])
+    general_defaults, editor_meta = _rss_editor_defaults(posts, schedules_by_post)
     return render_template(
         "rss_article_edit.html",
         item=item,
         posts=posts,
+        general_defaults=general_defaults,
+        editor_meta=editor_meta,
         schedules_by_post=schedules_by_post,
         media_by_post=media_by_post,
         content_formats=PLATFORM_CONTENT_FORMATS,
@@ -722,6 +739,64 @@ def _flash_media_result(saved, skipped):
         flash("Unsupported file(s) ignored: " + ", ".join(skipped), "warning")
 
 
+def _rss_editor_defaults(posts, schedules_by_post):
+    if not posts:
+        return {}, {}
+
+    base_post = posts[0]
+    base_schedules = schedules_by_post.get(base_post["id"], [])
+    general_defaults = {
+        "title": base_post["title"],
+        "content": base_post["content"],
+        "hashtags": base_post["hashtags"],
+        "status": base_post["status"],
+        "scheduled_parts": _datetime_parts(base_post["scheduled_at"]),
+        "schedule_text": _schedule_text(base_schedules),
+    }
+    editor_meta = {}
+    for post in posts:
+        post_schedules = schedules_by_post.get(post["id"], [])
+        editor_meta[post["id"]] = {
+            "schedule_text": _schedule_text(post_schedules),
+            "overrides": {
+                "title": post["title"] != general_defaults["title"],
+                "content": post["content"] != general_defaults["content"],
+                "hashtags": post["hashtags"] != general_defaults["hashtags"],
+                "status": post["status"] != general_defaults["status"],
+                "schedule": (
+                    post["scheduled_at"] != base_post["scheduled_at"]
+                    or _schedule_text(post_schedules) != general_defaults["schedule_text"]
+                ),
+            },
+        }
+    return general_defaults, editor_meta
+
+
+def _schedule_text(schedule_items):
+    return "\n".join(item["scheduled_at"] for item in schedule_items)
+
+
+def _override_or_general(prefix, field, current_value, general_value, max_length=None):
+    if _uses_field_override(prefix, field):
+        value = request.form.get(prefix + field, current_value)
+    else:
+        value = general_value
+    value = (value or "").strip()
+    return value[:max_length] if max_length else value
+
+
+def _uses_field_override(prefix, field):
+    return request.form.get(prefix + "override_" + field) == "1"
+
+
+def _reset_file_streams(files):
+    for file in files:
+        try:
+            file.stream.seek(0)
+        except (AttributeError, OSError):
+            continue
+
+
 def _schedule_dates_from_form():
     dates = []
     primary = _datetime_from_form()
@@ -741,6 +816,18 @@ def _schedule_dates_from_prefixed_form(prefix):
     extra_dates = request.form.get(prefix + "schedule_dates", "")
     dates.extend(_normalize_datetime_value(line.strip()) for line in extra_dates.splitlines() if line.strip())
     dates.extend(_recurring_dates_from_form(prefix))
+    return dates
+
+
+def _schedule_dates_from_general_form():
+    dates = []
+    primary = _datetime_from_form("", "general_scheduled")
+    if primary:
+        dates.append(primary)
+
+    extra_dates = request.form.get("general_schedule_dates", "")
+    dates.extend(_normalize_datetime_value(line.strip()) for line in extra_dates.splitlines() if line.strip())
+    dates.extend(_recurring_dates_from_form("general_"))
     return dates
 
 
