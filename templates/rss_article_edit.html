@@ -42,13 +42,35 @@
         </div>
     </section>
 
+    {% if posts %}
+    <section class="source-panel shared-copy-panel">
+        <div>
+            <strong>Shared copy</strong>
+            <small>Use this when the base copy should be the same across every selected network.</small>
+        </div>
+        <textarea id="shared-copy" rows="4">{{ posts[0].content }}</textarea>
+        <button class="button" type="button" id="apply-shared-copy">Apply copy to all network versions</button>
+    </section>
+
+    <nav class="network-jump-list" aria-label="Network versions">
+        {% for post in posts %}
+        <button class="network-jump" type="button" data-target-version="version-{{ post.id }}">
+            <span>{{ post.platform[:1] }}</span>
+            {{ post.platform }}
+        </button>
+        {% endfor %}
+    </nav>
+    {% endif %}
+
     {% for post in posts %}
     {% set prefix = "post_" ~ post.id ~ "_" %}
     {% set schedule_items = schedules_by_post.get(post.id, []) %}
     {% set media_items = media_by_post.get(post.id, []) %}
     {% set scheduled_parts = datetime_parts(post.scheduled_at) %}
     {% set repeat_parts = datetime_parts('') %}
-    <article class="version-card" data-version-card>
+    {% set current_rule = format_rules.get(post.content_format, {}) %}
+    {% set current_allowed = current_rule.get("allowed_media_types", []) %}
+    <article class="version-card" id="version-{{ post.id }}" data-version-card>
         <div class="version-card-header">
             <div>
                 <p class="eyebrow">{{ post.platform }}</p>
@@ -69,7 +91,7 @@
             <textarea data-preview-content name="{{ prefix }}content" rows="8" maxlength="2200" required>{{ post.content }}</textarea>
         </label>
 
-        <div class="form-row">
+        <div class="form-row compact-controls">
             <label>
                 Format
                 <select data-preview-format name="{{ prefix }}content_format">
@@ -88,7 +110,7 @@
             </label>
         </div>
 
-        <div class="form-row">
+        <div class="form-row compact-controls schedule-row">
             <label>
                 Main scheduled date
                 <input type="date" name="{{ prefix }}scheduled_date" value="{{ scheduled_parts.date }}">
@@ -132,10 +154,17 @@
             <div>
                 <strong>Media for {{ post.platform }}</strong>
                 <p>{{ media_guides.get(post.platform, "Attach the media required by this platform.") }}</p>
+                <p class="format-guide" data-format-rule>{{ current_rule.get("layout", "") }} {{ current_rule.get("copy_guidance", "") }}</p>
             </div>
             <label class="upload-box">
                 Upload media
-                <input data-preview-media-input type="file" name="{{ prefix }}media_files" multiple accept="image/*,video/*">
+                <input
+                    data-preview-media-input
+                    type="file"
+                    name="{{ prefix }}media_files"
+                    multiple
+                    accept="{% if current_allowed == ['image'] %}image/*{% elif current_allowed == ['video'] %}video/*{% else %}image/*,video/*{% endif %}"
+                >
                 <span>Images and videos attached here only apply to this network version.</span>
             </label>
             {% if media_items %}
@@ -192,6 +221,22 @@
     </div>
 </form>
 <script>
+const formatRules = {{ format_rules|tojson }};
+
+document.querySelector("#apply-shared-copy")?.addEventListener("click", () => {
+    const sharedCopy = document.querySelector("#shared-copy").value;
+    document.querySelectorAll("[data-preview-content]").forEach((field) => {
+        field.value = sharedCopy;
+        field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+});
+
+document.querySelectorAll("[data-target-version]").forEach((button) => {
+    button.addEventListener("click", () => {
+        document.getElementById(button.dataset.targetVersion)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+});
+
 document.querySelectorAll("[data-version-card]").forEach((card) => {
     const titleInput = card.querySelector("[data-preview-title]");
     const contentInput = card.querySelector("[data-preview-content]");
@@ -206,6 +251,7 @@ document.querySelectorAll("[data-version-card]").forEach((card) => {
     const hashtagsOutput = card.querySelector("[data-preview-hashtags-output]");
     const mediaOutput = card.querySelector("[data-preview-media]");
     const previewCard = card.querySelector("[data-preview-card]");
+    const ruleOutput = card.querySelector("[data-format-rule]");
 
     function syncPreview() {
         const format = formatInput.value;
@@ -215,7 +261,21 @@ document.querySelectorAll("[data-version-card]").forEach((card) => {
         statusOutput.textContent = statusInput.value;
         statusOutput.className = `status ${statusInput.value.toLowerCase()}`;
         hashtagsOutput.textContent = hashtagsInput.value.trim();
-        previewCard.className = `social-preview ${previewClassForFormat(format)}`;
+        previewCard.className = `social-preview ${previewClassForFormat(format)} ${previewCopyClassForFormat(format)}`;
+        syncFormatRule(format);
+    }
+
+    function syncFormatRule(format) {
+        const rule = formatRules[format] || {};
+        const allowedTypes = rule.allowed_media_types || [];
+        ruleOutput.textContent = [rule.layout, rule.copy_guidance].filter(Boolean).join(" ");
+        if (allowedTypes.length === 1 && allowedTypes[0] === "image") {
+            mediaInput.accept = "image/*";
+        } else if (allowedTypes.length === 1 && allowedTypes[0] === "video") {
+            mediaInput.accept = "video/*";
+        } else {
+            mediaInput.accept = "image/*,video/*";
+        }
     }
 
     function previewClassForFormat(format) {
@@ -233,6 +293,10 @@ document.querySelectorAll("[data-version-card]").forEach((card) => {
             return "preview-text";
         }
         return "preview-feed";
+    }
+
+    function previewCopyClassForFormat(format) {
+        return format.toLowerCase().includes("story") ? "preview-no-copy" : "";
     }
 
     function syncSelectedMediaPreview() {

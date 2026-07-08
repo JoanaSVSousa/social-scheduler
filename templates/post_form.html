@@ -158,6 +158,7 @@
 const mediaGuides = {{ media_guides|tojson }};
 const contentFormats = {{ content_formats|tojson }};
 const formatGuides = {{ format_guides|tojson }};
+const formatRules = {{ format_rules|tojson }};
 const platformSelect = document.querySelector("#platform-select");
 const formatSelect = document.querySelector("#format-select");
 const statusSelect = document.querySelector("#status-select");
@@ -201,8 +202,21 @@ function syncFormats() {
 function syncGuides() {
     const platform = platformSelect.value;
     const format = formatSelect.value;
+    const rule = formatRules[format] || {};
+    const allowedTypes = rule.allowed_media_types || [];
     mediaGuide.textContent = mediaGuides[platformSelect.value] || "";
-    formatGuide.textContent = (formatGuides[platform] && formatGuides[platform][format]) || "";
+    formatGuide.textContent = [
+        (formatGuides[platform] && formatGuides[platform][format]) || "",
+        rule.layout || "",
+        rule.copy_guidance || "",
+    ].filter(Boolean).join(" ");
+    if (allowedTypes.length === 1 && allowedTypes[0] === "image") {
+        mediaInput.accept = "image/*";
+    } else if (allowedTypes.length === 1 && allowedTypes[0] === "video") {
+        mediaInput.accept = "video/*";
+    } else {
+        mediaInput.accept = "image/*,video/*";
+    }
 }
 
 function syncPreview() {
@@ -214,7 +228,7 @@ function syncPreview() {
     previewTitle.textContent = titleInput.value.trim() || "Untitled post";
     previewContent.textContent = contentInput.value.trim() || "Write the post content to preview it here.";
     previewHashtags.textContent = hashtagsInput.value.trim();
-    previewCard.className = `social-preview ${previewClassForFormat(format)}`;
+    previewCard.className = `social-preview ${previewClassForFormat(format)} ${previewCopyClassForFormat(format)}`;
 }
 
 function previewClassForFormat(format) {
@@ -232,6 +246,10 @@ function previewClassForFormat(format) {
         return "preview-text";
     }
     return "preview-feed";
+}
+
+function previewCopyClassForFormat(format) {
+    return format.toLowerCase().includes("story") ? "preview-no-copy" : "";
 }
 
 function syncSelectedMediaPreview() {

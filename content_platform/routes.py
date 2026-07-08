@@ -6,6 +6,7 @@ from flask import Blueprint, abort, flash, redirect, render_template, request, u
 
 from .models import (
     FORMAT_MEDIA_GUIDES,
+    FORMAT_MEDIA_RULES,
     PLATFORM_CONTENT_FORMATS,
     PLATFORM_MEDIA_GUIDES,
     PLATFORMS,
@@ -323,7 +324,7 @@ def quick_edit_calendar_post(post_id):
         abort(400)
 
     update_post_text(post_id, title, content, hashtags)
-    saved, skipped = save_media_files(post_id, request.files.getlist("media_files"))
+    saved, skipped = save_media_files(post_id, request.files.getlist("media_files"), post["content_format"])
     _flash_media_result(saved, skipped)
     flash("Calendar quick edit saved.", "success")
     return redirect(url_for("main.dashboard"))
@@ -425,7 +426,12 @@ def edit_rss_article(rss_item_id):
             if prefix + "title" not in request.form:
                 continue
             replace_schedules(post["id"], _schedule_dates_from_prefixed_form(prefix))
-            saved, skipped = save_media_files(post["id"], request.files.getlist(prefix + "media_files"))
+            content_format = request.form.get(prefix + "content_format", post["content_format"])
+            saved, skipped = save_media_files(
+                post["id"],
+                request.files.getlist(prefix + "media_files"),
+                content_format,
+            )
             _flash_media_result(saved, skipped)
         flash("Article versions updated.", "success")
         return redirect(url_for("main.edit_rss_article", rss_item_id=rss_item_id))
@@ -443,6 +449,7 @@ def edit_rss_article(rss_item_id):
         statuses=STATUSES,
         platforms=PLATFORMS,
         datetime_parts=_datetime_parts,
+        format_rules=FORMAT_MEDIA_RULES,
     )
 
 
@@ -452,7 +459,7 @@ def new_post():
         validate_csrf()
         post_id = create_post(_post_from_form())
         replace_schedules(post_id, _schedule_dates_from_form())
-        saved, skipped = save_media_files(post_id, request.files.getlist("media_files"))
+        saved, skipped = save_media_files(post_id, request.files.getlist("media_files"), request.form.get("content_format", ""))
         _flash_media_result(saved, skipped)
         return redirect(url_for("main.posts"))
 
@@ -463,6 +470,7 @@ def new_post():
         schedules=[],
         content_formats=PLATFORM_CONTENT_FORMATS,
         format_guides=FORMAT_MEDIA_GUIDES,
+        format_rules=FORMAT_MEDIA_RULES,
         media_guides=PLATFORM_MEDIA_GUIDES,
         statuses=STATUSES,
         platforms=PLATFORMS,
@@ -481,7 +489,7 @@ def edit_post(post_id):
         validate_csrf()
         update_post(post_id, _post_from_form())
         replace_schedules(post_id, _schedule_dates_from_form())
-        saved, skipped = save_media_files(post_id, request.files.getlist("media_files"))
+        saved, skipped = save_media_files(post_id, request.files.getlist("media_files"), request.form.get("content_format", ""))
         _flash_media_result(saved, skipped)
         return redirect(url_for("main.posts"))
 
@@ -492,6 +500,7 @@ def edit_post(post_id):
         schedules=get_schedules_for_post(post_id),
         content_formats=PLATFORM_CONTENT_FORMATS,
         format_guides=FORMAT_MEDIA_GUIDES,
+        format_rules=FORMAT_MEDIA_RULES,
         media_guides=PLATFORM_MEDIA_GUIDES,
         statuses=STATUSES,
         platforms=PLATFORMS,

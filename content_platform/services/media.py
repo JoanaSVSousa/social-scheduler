@@ -4,6 +4,7 @@ from uuid import uuid4
 from werkzeug.utils import secure_filename
 
 from ..database import PROJECT_ROOT, get_connection
+from ..models import FORMAT_MEDIA_RULES
 
 
 UPLOAD_DIR = PROJECT_ROOT / "static" / "uploads"
@@ -13,7 +14,7 @@ VIDEO_EXTENSIONS = {"mp4", "mov", "m4v", "webm"}
 MAX_FILE_SIZE = 20 * 1024 * 1024
 
 
-def save_media_files(post_id, files):
+def save_media_files(post_id, files, content_format=""):
     saved = []
     skipped = []
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -24,7 +25,7 @@ def save_media_files(post_id, files):
 
         extension = _extension(file.filename)
         if extension not in ALLOWED_EXTENSIONS or not _is_safe_upload(file, extension):
-            skipped.append(file.filename)
+            skipped.append(f"{file.filename} (unsupported file type or invalid file)")
             continue
 
         original_filename = secure_filename(file.filename)
@@ -33,21 +34,41 @@ def save_media_files(post_id, files):
             continue
 
         filename = f"{uuid4().hex}.{extension}"
-        file.save(UPLOAD_DIR / filename)
         media_type = "video" if extension in VIDEO_EXTENSIONS else "image"
+        if not _is_allowed_for_format(content_format, media_type):
+            skipped.append(f"{original_filename} ({content_format} does not accept {media_type} media)")
+            continue
 
-        with get_connection() as conn:
-            conn.execute(
-                """
-                INSERT INTO media_assets (post_id, filename, original_filename, media_type)
-                VALUES (?, ?, ?, ?)
-                """,
-                (post_id, filename, original_filename, media_type),
-            )
+        path = UPLOAD_DIR / filename
+        try:
+            file.save(path)
+            with get_connection() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO media_assets (post_id, filename, original_filename, media_type)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (post_id, filename, original_filename, media_type),
+                )
+        except Exception:
+            if path.exists():
+                path.unlink()
+            skipped.append(f"{original_filename} (could not be saved)")
+            continue
 
         saved.append(filename)
 
     return saved, skipped
+
+
+def _is_allowed_for_format(content_format, media_type):
+    rules = FORMAT_MEDIA_RULES.get(content_format or "")
+    if not rules:
+        return True
+    allowed_media_types = rules.get("allowed_media_types", [])
+    if not allowed_media_types:
+        return False
+    return media_type in allowed_media_types
 
 
 def get_media_for_post(post_id):

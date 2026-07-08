@@ -50,6 +50,57 @@ FORMAT_MEDIA_GUIDES = {
     },
 }
 
+FORMAT_MEDIA_RULES = {
+    "Story": {
+        "media_required": True,
+        "allowed_media_types": ["image", "video"],
+        "layout": "Vertical full-screen media. Keep text out of the asset when possible.",
+        "copy_guidance": "Story copy is mostly internal/editorial; the published asset carries the message.",
+    },
+    "Reel": {
+        "media_required": True,
+        "allowed_media_types": ["video"],
+        "layout": "Vertical 9:16 video.",
+        "copy_guidance": "Caption text is supported.",
+    },
+    "Short": {
+        "media_required": True,
+        "allowed_media_types": ["video"],
+        "layout": "Vertical 9:16 video.",
+        "copy_guidance": "Caption/description text is supported.",
+    },
+    "Video Post": {
+        "media_required": True,
+        "allowed_media_types": ["video"],
+        "layout": "Video-first post.",
+        "copy_guidance": "Caption text is supported.",
+    },
+    "Image Post": {
+        "media_required": True,
+        "allowed_media_types": ["image"],
+        "layout": "Image-first post.",
+        "copy_guidance": "Caption text is supported.",
+    },
+    "Carousel": {
+        "media_required": True,
+        "allowed_media_types": ["image", "video"],
+        "layout": "Multiple media items.",
+        "copy_guidance": "Caption text is supported.",
+    },
+    "Text Post": {
+        "media_required": False,
+        "allowed_media_types": [],
+        "layout": "Text-only post.",
+        "copy_guidance": "Media is hidden in preview for this format.",
+    },
+    "Thread": {
+        "media_required": False,
+        "allowed_media_types": ["image", "video"],
+        "layout": "Text-first multi-post format.",
+        "copy_guidance": "Media can support the first post.",
+    },
+}
+
 
 def default_content_format(platform):
     return PLATFORM_CONTENT_FORMATS.get(platform, ["Post"])[0]
