@@ -996,6 +996,43 @@ label {
     max-width: none;
 }
 
+.social-preview.preview-vertical {
+    margin: 0 auto;
+    max-width: 310px;
+}
+
+.social-preview.preview-vertical .preview-media {
+    grid-template-columns: 1fr;
+}
+
+.social-preview.preview-vertical .preview-media img,
+.social-preview.preview-vertical .preview-media video,
+.social-preview.preview-vertical .preview-media-empty {
+    aspect-ratio: 9 / 16;
+}
+
+.social-preview.preview-image .preview-media,
+.social-preview.preview-video .preview-media {
+    grid-template-columns: 1fr;
+}
+
+.social-preview.preview-image .preview-media img,
+.social-preview.preview-image .preview-media video,
+.social-preview.preview-image .preview-media-empty,
+.social-preview.preview-video .preview-media img,
+.social-preview.preview-video .preview-media video,
+.social-preview.preview-video .preview-media-empty {
+    aspect-ratio: 4 / 5;
+}
+
+.social-preview.preview-text .preview-media {
+    display: none;
+}
+
+.social-preview.preview-text {
+    gap: 10px;
+}
+
 .preview-topline {
     align-items: center;
     display: flex;

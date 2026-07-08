@@ -154,7 +154,7 @@
                 <h2>{{ post.platform }} preview</h2>
                 <p class="muted">Media attached in this card is the media set that will be used for this network version.</p>
             </div>
-            <article class="social-preview">
+            <article data-preview-card class="social-preview">
                 <div class="preview-topline">
                     <div>
                         <strong>{{ post.platform }}</strong>
@@ -205,14 +205,34 @@ document.querySelectorAll("[data-version-card]").forEach((card) => {
     const statusOutput = card.querySelector("[data-preview-status-output]");
     const hashtagsOutput = card.querySelector("[data-preview-hashtags-output]");
     const mediaOutput = card.querySelector("[data-preview-media]");
+    const previewCard = card.querySelector("[data-preview-card]");
 
     function syncPreview() {
+        const format = formatInput.value;
         titleOutput.textContent = titleInput.value.trim() || "Untitled post";
         contentOutput.textContent = contentInput.value.trim() || "Write the post content to preview it here.";
-        formatOutput.textContent = formatInput.value;
+        formatOutput.textContent = format;
         statusOutput.textContent = statusInput.value;
         statusOutput.className = `status ${statusInput.value.toLowerCase()}`;
         hashtagsOutput.textContent = hashtagsInput.value.trim();
+        previewCard.className = `social-preview ${previewClassForFormat(format)}`;
+    }
+
+    function previewClassForFormat(format) {
+        const normalized = format.toLowerCase();
+        if (normalized.includes("story") || normalized.includes("reel") || normalized.includes("short") || normalized.includes("tiktok")) {
+            return "preview-vertical";
+        }
+        if (normalized.includes("video")) {
+            return "preview-video";
+        }
+        if (normalized.includes("image") || normalized.includes("carousel")) {
+            return "preview-image";
+        }
+        if (normalized.includes("text") || normalized.includes("thread")) {
+            return "preview-text";
+        }
+        return "preview-feed";
     }
 
     function syncSelectedMediaPreview() {
