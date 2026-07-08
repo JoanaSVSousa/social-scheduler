@@ -307,6 +307,7 @@ table {
 }
 
 .post-col-scheduled,
+.post-col-added,
 .post-col-hashtags {
     width: 9%;
 }
@@ -463,7 +464,7 @@ tr:last-child td {
 .filters {
     display: grid;
     gap: 12px;
-    grid-template-columns: 1fr 180px 180px auto;
+    grid-template-columns: minmax(220px, 1fr) 170px 170px 150px 250px auto;
     margin-bottom: 18px;
 }
 

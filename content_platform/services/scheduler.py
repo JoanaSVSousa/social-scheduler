@@ -16,9 +16,13 @@ def get_all_posts(filters=None):
         query += " AND platform = ?"
         params.append(filters["platform"])
 
+    if filters.get("source_type"):
+        query += " AND source_type = ?"
+        params.append(filters["source_type"])
+
     if filters.get("search"):
-        query += " AND (title LIKE ? OR content LIKE ? OR hashtags LIKE ?)"
-        term = f"%{filters['search']}%"
+        query += " AND (LOWER(title) LIKE ? OR LOWER(content) LIKE ? OR LOWER(hashtags) LIKE ?)"
+        term = f"%{filters['search'].lower()}%"
         params.extend([term, term, term])
 
     query += " ORDER BY COALESCE(scheduled_at, created_at) ASC"

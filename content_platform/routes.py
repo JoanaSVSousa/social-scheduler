@@ -72,15 +72,28 @@ def dashboard():
 @bp.route("/posts")
 def posts():
     refresh_rss_content_types()
+    source_types = ["Regular", "News"]
+    sort_options = _post_sort_options()
     filters = {
         "status": request.args.get("status", ""),
         "platform": request.args.get("platform", ""),
+        "source_type": request.args.get("source_type", ""),
         "search": request.args.get("search", ""),
+        "sort": request.args.get("sort", "scheduled_asc"),
     }
+    if filters["status"] and filters["status"] not in STATUSES:
+        filters["status"] = ""
+    if filters["platform"] and filters["platform"] not in PLATFORMS:
+        filters["platform"] = ""
+    if filters["source_type"] and filters["source_type"] not in source_types:
+        filters["source_type"] = ""
+    if filters["sort"] not in sort_options:
+        filters["sort"] = "scheduled_asc"
     filtered_posts = get_all_posts(filters)
     media_by_post = get_media_for_posts([post["id"] for post in filtered_posts])
     schedules_by_post = get_schedules_for_posts([post["id"] for post in filtered_posts])
     post_rows = _aggregate_posts_for_library(filtered_posts, media_by_post, schedules_by_post)
+    post_rows = _sort_post_rows(post_rows, filters["sort"])
     return render_template(
         "posts.html",
         posts=post_rows,
@@ -88,6 +101,8 @@ def posts():
         schedules_by_post=schedules_by_post,
         statuses=STATUSES,
         platforms=PLATFORMS,
+        source_types=source_types,
+        sort_options=sort_options,
         filters=filters,
     )
 
@@ -100,6 +115,7 @@ def _aggregate_posts_for_library(posts, media_by_post, schedules_by_post):
         post_data = dict(post)
         if not post_data.get("rss_item_id"):
             post_data["is_rss_group"] = False
+            post_data["sort_scheduled_at"] = _earliest_schedule_value(post_data, schedules_by_post.get(post_data["id"], []))
             rows.append(post_data)
             continue
 
@@ -115,6 +131,8 @@ def _aggregate_posts_for_library(posts, media_by_post, schedules_by_post):
                 "status": post_data["status"],
                 "source_type": post_data["source_type"],
                 "scheduled_at": post_data["scheduled_at"],
+                "sort_scheduled_at": _earliest_schedule_value(post_data, schedules_by_post.get(post_data["id"], [])),
+                "created_at": post_data["created_at"],
                 "hashtags": post_data["hashtags"],
                 "is_rss_group": True,
                 "platforms": [],
@@ -127,8 +145,12 @@ def _aggregate_posts_for_library(posts, media_by_post, schedules_by_post):
         group["statuses"].append(post_data["status"])
         group["media_total"] += len(media_by_post.get(post_data["id"], []))
         group["schedule_total"] += len(schedules_by_post.get(post_data["id"], []))
-        if post_data["scheduled_at"] and (not group["scheduled_at"] or post_data["scheduled_at"] < group["scheduled_at"]):
-            group["scheduled_at"] = post_data["scheduled_at"]
+        post_schedule = _earliest_schedule_value(post_data, schedules_by_post.get(post_data["id"], []))
+        if post_schedule and (not group["sort_scheduled_at"] or post_schedule < group["sort_scheduled_at"]):
+            group["sort_scheduled_at"] = post_schedule
+            group["scheduled_at"] = post_schedule
+        if post_data["created_at"] and post_data["created_at"] < group["created_at"]:
+            group["created_at"] = post_data["created_at"]
 
     for group in rss_groups.values():
         group["platform"] = ", ".join(sorted(set(group["platforms"])))
@@ -137,6 +159,37 @@ def _aggregate_posts_for_library(posts, media_by_post, schedules_by_post):
         rows.append(group)
 
     return rows
+
+
+def _earliest_schedule_value(post, schedules):
+    values = []
+    if post["scheduled_at"]:
+        values.append(post["scheduled_at"])
+    values.extend(schedule["scheduled_at"] for schedule in schedules if schedule["scheduled_at"])
+    return min(values) if values else ""
+
+
+def _sort_post_rows(rows, sort_key):
+    sort_key = sort_key if sort_key in _post_sort_options() else "scheduled_asc"
+
+    if sort_key == "created_desc":
+        return sorted(rows, key=lambda row: row["created_at"] or "", reverse=True)
+    if sort_key == "created_asc":
+        return sorted(rows, key=lambda row: row["created_at"] or "")
+    if sort_key == "scheduled_desc":
+        scheduled_rows = [row for row in rows if row["sort_scheduled_at"]]
+        unscheduled_rows = [row for row in rows if not row["sort_scheduled_at"]]
+        return sorted(scheduled_rows, key=lambda row: row["sort_scheduled_at"], reverse=True) + unscheduled_rows
+    return sorted(rows, key=lambda row: (row["sort_scheduled_at"] == "", row["sort_scheduled_at"] or ""))
+
+
+def _post_sort_options():
+    return {
+        "scheduled_asc": "Scheduled date: soonest first",
+        "scheduled_desc": "Scheduled date: latest first",
+        "created_desc": "Added date: newest first",
+        "created_asc": "Added date: oldest first",
+    }
 
 
 def _build_dashboard_calendar(posts, schedules_by_post):

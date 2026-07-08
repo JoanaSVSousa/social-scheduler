@@ -23,6 +23,17 @@
         <option value="{{ status }}" {% if filters.status == status %}selected{% endif %}>{{ status }}</option>
         {% endfor %}
     </select>
+    <select name="source_type">
+        <option value="">All types</option>
+        {% for source_type in source_types %}
+        <option value="{{ source_type }}" {% if filters.source_type == source_type %}selected{% endif %}>{{ source_type }}</option>
+        {% endfor %}
+    </select>
+    <select name="sort">
+        {% for value, label in sort_options.items() %}
+        <option value="{{ value }}" {% if filters.sort == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
     <button class="button" type="submit">Filter</button>
 </form>
 
@@ -37,6 +48,7 @@
             <col class="post-col-media">
             <col class="post-col-schedules">
             <col class="post-col-scheduled">
+            <col class="post-col-added">
             <col class="post-col-hashtags">
             <col class="post-col-actions">
         </colgroup>
@@ -50,6 +62,7 @@
                 <th>Media</th>
                 <th>Schedules</th>
                 <th>Scheduled</th>
+                <th>Added</th>
                 <th>Hashtags</th>
                 <th></th>
             </tr>
@@ -109,6 +122,7 @@
                     {% endif %}
                 </td>
                 <td>{{ post.scheduled_at or "Not scheduled" }}</td>
+                <td>{{ post.created_at }}</td>
                 <td>{{ post.hashtags }}</td>
                 <td class="actions">
                     {% if post.is_rss_group %}
@@ -127,7 +141,7 @@
                 </td>
             </tr>
             {% else %}
-            <tr><td colspan="10">No posts found.</td></tr>
+            <tr><td colspan="11">No posts found.</td></tr>
             {% endfor %}
         </tbody>
     </table>
