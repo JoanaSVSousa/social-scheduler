@@ -71,6 +71,19 @@ def mark_schedule_status(schedule_id, status):
         )
 
 
+def get_schedule(schedule_id):
+    with get_connection() as conn:
+        return conn.execute("SELECT * FROM post_schedules WHERE id = ?", (schedule_id,)).fetchone()
+
+
+def move_schedule_date(schedule_id, scheduled_at):
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE post_schedules SET scheduled_at = ? WHERE id = ?",
+            (scheduled_at, schedule_id),
+        )
+
+
 def _clean_dates(schedule_dates):
     seen = set()
     cleaned = []

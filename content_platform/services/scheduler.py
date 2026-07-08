@@ -86,6 +86,30 @@ def update_post(post_id, post):
     add_log(post_id, "INFO", f"Post updated with status {post.status}.")
 
 
+def update_post_text(post_id, title, content, hashtags):
+    with get_connection() as conn:
+        conn.execute(
+            """
+            UPDATE posts
+            SET title = ?, content = ?, hashtags = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (title, content, hashtags, post_id),
+        )
+
+    add_log(post_id, "INFO", "Post text updated from calendar quick editor.")
+
+
+def move_post_schedule_date(post_id, scheduled_at):
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE posts SET scheduled_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (scheduled_at, post_id),
+        )
+
+    add_log(post_id, "INFO", f"Post main schedule moved to {scheduled_at}.")
+
+
 def delete_post(post_id):
     with get_connection() as conn:
         conn.execute("DELETE FROM posts WHERE id = ?", (post_id,))

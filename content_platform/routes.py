@@ -34,13 +34,22 @@ from .services.rss_groups import (
     sync_rss_group_platforms,
     update_rss_group_posts,
 )
-from .services.schedules import get_schedules_for_post, get_schedules_for_posts, replace_schedules
+from .services.schedules import (
+    get_schedule,
+    get_schedules_for_post,
+    get_schedules_for_posts,
+    move_schedule_date,
+    replace_schedules,
+)
 from .services.scheduler import (
     create_post,
     delete_post,
+    add_log,
     get_all_posts,
     get_logs,
     get_post,
+    move_post_schedule_date,
+    update_post_text,
     update_post,
 )
 from .services.squared_feeds import SQUARED_FEEDS
@@ -241,10 +250,14 @@ def _calendar_events_for_month(posts, schedules_by_post, year, month):
     for post in posts:
         date_values = []
         if post["scheduled_at"]:
-            date_values.append(post["scheduled_at"])
-        date_values.extend(item["scheduled_at"] for item in schedules_by_post.get(post["id"], []))
+            date_values.append({"type": "post", "id": "", "scheduled_at": post["scheduled_at"]})
+        date_values.extend(
+            {"type": "schedule", "id": item["id"], "scheduled_at": item["scheduled_at"]}
+            for item in schedules_by_post.get(post["id"], [])
+        )
 
-        for scheduled_at in date_values:
+        for date_item in date_values:
+            scheduled_at = date_item["scheduled_at"]
             event_dt = _parse_calendar_datetime(scheduled_at)
             if event_dt is None or event_dt.year != year or event_dt.month != month:
                 continue
@@ -265,6 +278,12 @@ def _calendar_events_for_month(posts, schedules_by_post, year, month):
                 "platforms": [post["platform"]],
                 "status": post["status"],
                 "url": _edit_url_for_post(post),
+                "post_id": post["id"],
+                "schedule_id": date_item["id"],
+                "event_type": date_item["type"],
+                "scheduled_at": scheduled_at,
+                "content": post["content"],
+                "hashtags": post["hashtags"],
             }
             seen[event_key] = event
             events.setdefault(event_dt.strftime("%Y-%m-%d"), []).append(event)
@@ -288,6 +307,65 @@ def _edit_url_for_post(post):
     if post["rss_item_id"]:
         return url_for("main.edit_rss_article", rss_item_id=post["rss_item_id"])
     return url_for("main.edit_post", post_id=post["id"])
+
+
+@bp.post("/calendar/posts/<int:post_id>/quick-edit")
+def quick_edit_calendar_post(post_id):
+    validate_csrf()
+    post = get_post(post_id)
+    if post is None:
+        abort(404)
+
+    title = request.form.get("title", "").strip()[:120]
+    content = request.form.get("content", "").strip()[:2200]
+    hashtags = request.form.get("hashtags", "").strip()[:400]
+    if not title or not content:
+        abort(400)
+
+    update_post_text(post_id, title, content, hashtags)
+    saved, skipped = save_media_files(post_id, request.files.getlist("media_files"))
+    _flash_media_result(saved, skipped)
+    flash("Calendar quick edit saved.", "success")
+    return redirect(url_for("main.dashboard"))
+
+
+@bp.post("/calendar/reschedule")
+def reschedule_calendar_event():
+    validate_csrf()
+    event_type = request.form.get("event_type", "")
+    post_id = request.form.get("post_id", "").strip()
+    schedule_id = request.form.get("schedule_id", "").strip()
+    target_date = request.form.get("target_date", "").strip()
+    scheduled_at = request.form.get("scheduled_at", "").strip()
+
+    if not target_date or not scheduled_at:
+        abort(400)
+
+    current_dt = _parse_calendar_datetime(_normalize_datetime_value(scheduled_at))
+    if current_dt is None:
+        abort(400)
+    new_scheduled_at = f"{target_date}T{current_dt.strftime('%H:%M')}"
+    _normalize_datetime_value(new_scheduled_at)
+
+    if event_type == "schedule":
+        if not schedule_id:
+            abort(400)
+        schedule = get_schedule(int(schedule_id))
+        if schedule is None:
+            abort(404)
+        move_schedule_date(int(schedule_id), new_scheduled_at)
+        add_log(schedule["post_id"], "INFO", f"Recycled schedule moved to {new_scheduled_at} from calendar.")
+    elif event_type == "post":
+        if not post_id:
+            abort(400)
+        if get_post(int(post_id)) is None:
+            abort(404)
+        move_post_schedule_date(int(post_id), new_scheduled_at)
+    else:
+        abort(400)
+
+    flash("Schedule moved.", "success")
+    return redirect(url_for("main.dashboard"))
 
 
 def _int_arg(name, fallback):

@@ -60,15 +60,29 @@
         {% endfor %}
         {% for week in calendar_context.weeks %}
         {% for day in week %}
-        <article class="calendar-day {% if not day.is_current_month %}outside-month{% endif %}">
+        <article class="calendar-day {% if not day.is_current_month %}outside-month{% endif %}" data-calendar-date="{{ day.date.strftime('%Y-%m-%d') }}">
             <div class="calendar-day-number">{{ day.day }}</div>
             <div class="calendar-events">
                 {% for event in day.events[:4] %}
-                <a class="calendar-event status-border-{{ event.status|lower }}" href="{{ event.url }}">
+                <button
+                    class="calendar-event status-border-{{ event.status|lower }}"
+                    type="button"
+                    draggable="true"
+                    data-calendar-event
+                    data-post-id="{{ event.post_id }}"
+                    data-schedule-id="{{ event.schedule_id }}"
+                    data-event-type="{{ event.event_type }}"
+                    data-scheduled-at="{{ event.scheduled_at }}"
+                    data-title="{{ event.title|e }}"
+                    data-content="{{ event.content|e }}"
+                    data-hashtags="{{ event.hashtags|e }}"
+                    data-platform="{{ event.platform|e }}"
+                    data-edit-url="{{ event.url }}"
+                >
                     <span>{{ event.time }}</span>
                     <strong>{{ event.title }}</strong>
                     <small>{{ event.platform }}</small>
-                </a>
+                </button>
                 {% endfor %}
                 {% if day.events|length > 4 %}
                 <span class="calendar-more">+{{ day.events|length - 4 }} more</span>
@@ -79,6 +93,118 @@
         {% endfor %}
     </div>
 </section>
+
+<div class="modal-backdrop" id="calendar-modal" hidden>
+    <section class="quick-editor-modal" role="dialog" aria-modal="true" aria-labelledby="calendar-modal-title">
+        <form method="post" enctype="multipart/form-data" id="calendar-quick-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="modal-header">
+                <div>
+                    <p class="eyebrow" id="calendar-modal-platform">Calendar</p>
+                    <h2 id="calendar-modal-title">Quick edit</h2>
+                </div>
+                <button class="button" type="button" data-close-calendar-modal>Close</button>
+            </div>
+
+            <label>
+                Title
+                <input name="title" maxlength="120" required>
+            </label>
+
+            <label>
+                Content
+                <textarea name="content" rows="6" maxlength="2200" required></textarea>
+            </label>
+
+            <label>
+                Hashtags
+                <input name="hashtags" maxlength="400">
+            </label>
+
+            <label class="upload-box">
+                Add media
+                <input type="file" name="media_files" multiple accept="image/*,video/*">
+                <span>Files added here are attached to this post for publishing.</span>
+            </label>
+
+            <div class="form-actions">
+                <button class="button primary" type="submit">Save quick edit</button>
+                <a class="button" id="calendar-full-edit-link" href="#">Full editor</a>
+            </div>
+        </form>
+    </section>
+</div>
+
+<form method="post" action="{{ url_for('main.reschedule_calendar_event') }}" id="calendar-reschedule-form" hidden>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="post_id">
+    <input type="hidden" name="schedule_id">
+    <input type="hidden" name="event_type">
+    <input type="hidden" name="scheduled_at">
+    <input type="hidden" name="target_date">
+</form>
+
+<script>
+const calendarModal = document.querySelector("#calendar-modal");
+const calendarQuickForm = document.querySelector("#calendar-quick-form");
+const calendarFullEditLink = document.querySelector("#calendar-full-edit-link");
+const calendarModalPlatform = document.querySelector("#calendar-modal-platform");
+const calendarRescheduleForm = document.querySelector("#calendar-reschedule-form");
+let draggedCalendarEvent = null;
+
+function openCalendarModal(eventButton) {
+    calendarQuickForm.action = `/calendar/posts/${eventButton.dataset.postId}/quick-edit`;
+    calendarQuickForm.elements.title.value = eventButton.dataset.title || "";
+    calendarQuickForm.elements.content.value = eventButton.dataset.content || "";
+    calendarQuickForm.elements.hashtags.value = eventButton.dataset.hashtags || "";
+    calendarModalPlatform.textContent = eventButton.dataset.platform || "Calendar";
+    calendarFullEditLink.href = eventButton.dataset.editUrl || "#";
+    calendarModal.hidden = false;
+}
+
+function closeCalendarModal() {
+    calendarModal.hidden = true;
+}
+
+document.querySelectorAll("[data-calendar-event]").forEach((eventButton) => {
+    eventButton.addEventListener("click", () => openCalendarModal(eventButton));
+    eventButton.addEventListener("dragstart", (event) => {
+        draggedCalendarEvent = eventButton;
+        event.dataTransfer.effectAllowed = "move";
+    });
+});
+
+document.querySelectorAll("[data-calendar-date]").forEach((day) => {
+    day.addEventListener("dragover", (event) => {
+        if (!draggedCalendarEvent) {
+            return;
+        }
+        event.preventDefault();
+        day.classList.add("calendar-day-drop");
+    });
+    day.addEventListener("dragleave", () => day.classList.remove("calendar-day-drop"));
+    day.addEventListener("drop", (event) => {
+        event.preventDefault();
+        day.classList.remove("calendar-day-drop");
+        if (!draggedCalendarEvent) {
+            return;
+        }
+        calendarRescheduleForm.elements.post_id.value = draggedCalendarEvent.dataset.postId || "";
+        calendarRescheduleForm.elements.schedule_id.value = draggedCalendarEvent.dataset.scheduleId || "";
+        calendarRescheduleForm.elements.event_type.value = draggedCalendarEvent.dataset.eventType || "";
+        calendarRescheduleForm.elements.scheduled_at.value = draggedCalendarEvent.dataset.scheduledAt || "";
+        calendarRescheduleForm.elements.target_date.value = day.dataset.calendarDate || "";
+        calendarRescheduleForm.submit();
+    });
+});
+
+document.querySelector("[data-close-calendar-modal]").addEventListener("click", closeCalendarModal);
+calendarModal.addEventListener("click", (event) => {
+    if (event.target === calendarModal) {
+        closeCalendarModal();
+    }
+});
+</script>
 
 <section>
     <div>
