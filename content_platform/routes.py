@@ -54,7 +54,8 @@ from .services.scheduler import (
     update_post,
 )
 from .services.social_accounts import (
-    SECRET_FIELDS,
+    SOCIAL_ACCOUNT_SCHEMAS,
+    credential_field_names,
     credential_summary,
     delete_social_account,
     save_social_account,
@@ -88,7 +89,7 @@ def dashboard():
         social_credential_summaries={
             platform: credential_summary(account) for platform, account in social_accounts.items()
         },
-        credential_fields=SECRET_FIELDS,
+        social_account_schemas=SOCIAL_ACCOUNT_SCHEMAS,
         platforms=PLATFORMS,
     )
 
@@ -589,7 +590,7 @@ def save_social_account_settings(platform):
     if platform not in PLATFORMS:
         abort(404)
 
-    credentials = {field: request.form.get(field, "") for field in SECRET_FIELDS}
+    credentials = {field: request.form.get(field, "") for field in credential_field_names(platform)}
     try:
         save_social_account(
             platform,

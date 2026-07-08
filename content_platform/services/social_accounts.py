@@ -9,10 +9,98 @@ from flask import current_app
 from ..database import get_connection
 
 
-SECRET_FIELDS = ["api_key", "api_secret", "access_token", "refresh_token", "page_id"]
 PUBLIC_FIELDS = ["account_label", "account_handle", "auth_type"]
 STATUS_CONNECTED = "Connected"
 STATUS_NEEDS_VERIFICATION = "Needs verification"
+
+SOCIAL_ACCOUNT_SCHEMAS = {
+    "Instagram": {
+        "description": "Meta/Instagram publishing usually needs a professional IG account, a linked Facebook Page, and a long-lived access token.",
+        "auth_options": [("meta_graph", "Meta Graph API")],
+        "fields": [
+            {"name": "instagram_business_id", "label": "Instagram Business ID", "placeholder": "1784..."},
+            {"name": "facebook_page_id", "label": "Linked Facebook Page ID", "placeholder": "Page ID"},
+            {"name": "access_token", "label": "Long-lived Access Token", "placeholder": "Paste Meta access token"},
+        ],
+    },
+    "Facebook": {
+        "description": "Facebook Page publishing needs the Page ID and a Page access token with publishing permissions.",
+        "auth_options": [("meta_graph", "Meta Graph API")],
+        "fields": [
+            {"name": "page_id", "label": "Page ID", "placeholder": "Facebook Page ID"},
+            {"name": "access_token", "label": "Page Access Token", "placeholder": "Paste Page access token"},
+            {"name": "app_id", "label": "App ID", "placeholder": "Optional Meta App ID"},
+            {"name": "app_secret", "label": "App Secret", "placeholder": "Optional Meta App Secret"},
+        ],
+    },
+    "LinkedIn": {
+        "description": "LinkedIn publishing needs OAuth credentials and, for company posts, the organization ID/URN.",
+        "auth_options": [("oauth", "LinkedIn OAuth")],
+        "fields": [
+            {"name": "organization_id", "label": "Organization ID / URN", "placeholder": "urn:li:organization:..."},
+            {"name": "access_token", "label": "Access Token", "placeholder": "Paste LinkedIn access token"},
+            {"name": "refresh_token", "label": "Refresh Token", "placeholder": "Optional refresh token"},
+        ],
+    },
+    "X": {
+        "description": "X can require OAuth 1.0a user tokens for posting, plus bearer/API keys depending on the endpoint.",
+        "auth_options": [("oauth1", "OAuth 1.0a user tokens"), ("oauth2", "OAuth 2.0")],
+        "fields": [
+            {"name": "api_key", "label": "API Key", "placeholder": "Consumer/API key"},
+            {"name": "api_secret", "label": "API Secret", "placeholder": "Consumer/API secret"},
+            {"name": "access_token", "label": "Access Token", "placeholder": "User access token"},
+            {"name": "access_token_secret", "label": "Access Token Secret", "placeholder": "User access token secret"},
+            {"name": "bearer_token", "label": "Bearer Token", "placeholder": "Optional bearer token"},
+        ],
+    },
+    "Threads": {
+        "description": "Threads publishing uses Meta/Threads credentials: a Threads user ID and access token.",
+        "auth_options": [("threads_api", "Threads API")],
+        "fields": [
+            {"name": "threads_user_id", "label": "Threads User ID", "placeholder": "Threads user ID"},
+            {"name": "access_token", "label": "Access Token", "placeholder": "Paste Threads access token"},
+        ],
+    },
+    "Bluesky": {
+        "description": "Bluesky is the lightest first integration: use the account handle/email and an app password, not your main password.",
+        "auth_options": [("app_password", "Handle + app password")],
+        "fields": [
+            {"name": "identifier", "label": "Handle or Email", "placeholder": "squaredpotato.bsky.social"},
+            {"name": "app_password", "label": "App Password", "placeholder": "Paste Bluesky app password"},
+            {"name": "pds_url", "label": "PDS URL", "placeholder": "https://bsky.social"},
+        ],
+    },
+    "YouTube Shorts": {
+        "description": "YouTube uploads use Google OAuth. A refresh token is normally needed for scheduled publishing.",
+        "auth_options": [("google_oauth", "Google OAuth")],
+        "fields": [
+            {"name": "channel_id", "label": "Channel ID", "placeholder": "YouTube channel ID"},
+            {"name": "client_id", "label": "OAuth Client ID", "placeholder": "Google OAuth client ID"},
+            {"name": "client_secret", "label": "OAuth Client Secret", "placeholder": "Google OAuth client secret"},
+            {"name": "refresh_token", "label": "Refresh Token", "placeholder": "Google refresh token"},
+        ],
+    },
+    "TikTok": {
+        "description": "TikTok publishing uses a developer app plus access tokens for the connected creator account.",
+        "auth_options": [("tiktok_api", "TikTok API")],
+        "fields": [
+            {"name": "client_key", "label": "Client Key", "placeholder": "TikTok client key"},
+            {"name": "client_secret", "label": "Client Secret", "placeholder": "TikTok client secret"},
+            {"name": "access_token", "label": "Access Token", "placeholder": "TikTok access token"},
+            {"name": "open_id", "label": "Open ID", "placeholder": "Connected account open_id"},
+        ],
+    },
+}
+
+DEFAULT_SOCIAL_ACCOUNT_SCHEMA = {
+    "description": "Store the credentials required by this platform.",
+    "auth_options": [("api_keys", "API keys / tokens")],
+    "fields": [
+        {"name": "api_key", "label": "API Key", "placeholder": "Paste API key"},
+        {"name": "api_secret", "label": "API Secret", "placeholder": "Paste API secret"},
+        {"name": "access_token", "label": "Access Token", "placeholder": "Paste access token"},
+    ],
+}
 
 
 def list_social_accounts():
@@ -33,7 +121,7 @@ def get_social_account(platform):
 def save_social_account(platform, account_label, account_handle, auth_type, credential_values):
     existing = get_social_account(platform)
     credentials = _stored_credentials(existing, fail_closed=True)
-    for field_name in SECRET_FIELDS:
+    for field_name in credential_field_names(platform):
         value = credential_values.get(field_name, "").strip()
         if value:
             credentials[field_name] = value
@@ -76,7 +164,15 @@ def delete_social_account(platform):
 
 def credential_summary(account):
     credentials = _stored_credentials(account)
-    return {field: bool(credentials.get(field)) for field in SECRET_FIELDS}
+    return {field: bool(credentials.get(field)) for field in credential_field_names(account["platform"])}
+
+
+def credential_schema_for_platform(platform):
+    return SOCIAL_ACCOUNT_SCHEMAS.get(platform, DEFAULT_SOCIAL_ACCOUNT_SCHEMA)
+
+
+def credential_field_names(platform):
+    return [field["name"] for field in credential_schema_for_platform(platform)["fields"]]
 
 
 def decrypt_credentials_for_publisher(platform):
