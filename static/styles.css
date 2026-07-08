@@ -407,6 +407,11 @@ tr:last-child td {
     color: var(--yellow);
 }
 
+.media-panel .media-pill {
+    background: rgba(93, 240, 167, 0.14);
+    color: var(--green);
+}
+
 .type-pill.regular {
     background: rgba(99, 230, 255, 0.12);
     color: var(--cyan);
@@ -944,6 +949,13 @@ label {
     min-height: 36px;
 }
 
+.network-jump.active,
+.mini-tab.active {
+    background: rgba(255, 79, 216, 0.16);
+    border-color: rgba(255, 79, 216, 0.48);
+    color: white;
+}
+
 .network-jump span {
     align-items: center;
     background: rgba(255, 79, 216, 0.16);
@@ -966,6 +978,10 @@ label {
     padding: 18px;
     overflow: hidden;
     position: relative;
+}
+
+.version-card.is-hidden {
+    display: none;
 }
 
 .version-card-header {
@@ -992,6 +1008,25 @@ label {
 
 .schedule-row {
     align-items: end;
+}
+
+.field-label-with-tabs {
+    align-items: center;
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+}
+
+.network-mini-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.mini-tab {
+    font-size: 0.78rem;
+    min-height: 30px;
+    padding: 0 10px;
 }
 
 .sticky-actions {

@@ -45,8 +45,8 @@
     {% if posts %}
     <section class="source-panel shared-copy-panel">
         <div>
-            <strong>Shared copy</strong>
-            <small>Use this when the base copy should be the same across every selected network.</small>
+            <strong>General copy</strong>
+            <small>Used by every selected network unless you open a network tab and customize its copy.</small>
         </div>
         <textarea id="shared-copy" rows="4">{{ posts[0].content }}</textarea>
         <button class="button" type="button" id="apply-shared-copy">Apply copy to all network versions</button>
@@ -54,7 +54,7 @@
 
     <nav class="network-jump-list" aria-label="Network versions">
         {% for post in posts %}
-        <button class="network-jump" type="button" data-target-version="version-{{ post.id }}">
+        <button class="network-jump {% if loop.first %}active{% endif %}" type="button" data-target-version="version-{{ post.id }}">
             <span>{{ post.platform[:1] }}</span>
             {{ post.platform }}
         </button>
@@ -70,7 +70,7 @@
     {% set repeat_parts = datetime_parts('') %}
     {% set current_rule = format_rules.get(post.content_format, {}) %}
     {% set current_allowed = current_rule.get("allowed_media_types", []) %}
-    <article class="version-card" id="version-{{ post.id }}" data-version-card>
+    <article class="version-card {% if not loop.first %}is-hidden{% endif %}" id="version-{{ post.id }}" data-version-card data-platform="{{ post.platform }}">
         <div class="version-card-header">
             <div>
                 <p class="eyebrow">{{ post.platform }}</p>
@@ -87,8 +87,15 @@
         </label>
 
         <label>
-            Content
+            <span class="field-label-with-tabs">
+                Content
+                <span class="network-mini-tabs">
+                    <button class="mini-tab active" type="button" data-use-general-copy>General</button>
+                    <button class="mini-tab" type="button" data-custom-copy>Custom {{ post.platform }}</button>
+                </span>
+            </span>
             <textarea data-preview-content name="{{ prefix }}content" rows="8" maxlength="2200" required>{{ post.content }}</textarea>
+            <span class="field-help" data-copy-state>Using the general copy unless edited here.</span>
         </label>
 
         <div class="form-row compact-controls">
@@ -227,13 +234,30 @@ document.querySelector("#apply-shared-copy")?.addEventListener("click", () => {
     const sharedCopy = document.querySelector("#shared-copy").value;
     document.querySelectorAll("[data-preview-content]").forEach((field) => {
         field.value = sharedCopy;
+        field.dataset.customCopy = "";
+        field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    document.querySelectorAll("[data-copy-state]").forEach((state) => {
+        state.textContent = "Using general copy.";
+    });
+});
+
+document.querySelector("#shared-copy")?.addEventListener("input", (event) => {
+    document.querySelectorAll("[data-preview-content]").forEach((field) => {
+        if (field.dataset.customCopy === "1") {
+            return;
+        }
+        field.value = event.target.value;
         field.dispatchEvent(new Event("input", { bubbles: true }));
     });
 });
 
 document.querySelectorAll("[data-target-version]").forEach((button) => {
     button.addEventListener("click", () => {
-        document.getElementById(button.dataset.targetVersion)?.scrollIntoView({ behavior: "smooth", block: "start" });
+        document.querySelectorAll("[data-target-version]").forEach((item) => item.classList.remove("active"));
+        document.querySelectorAll("[data-version-card]").forEach((card) => card.classList.add("is-hidden"));
+        button.classList.add("active");
+        document.getElementById(button.dataset.targetVersion)?.classList.remove("is-hidden");
     });
 });
 
@@ -252,6 +276,26 @@ document.querySelectorAll("[data-version-card]").forEach((card) => {
     const mediaOutput = card.querySelector("[data-preview-media]");
     const previewCard = card.querySelector("[data-preview-card]");
     const ruleOutput = card.querySelector("[data-format-rule]");
+    const sharedCopy = document.querySelector("#shared-copy");
+    const copyState = card.querySelector("[data-copy-state]");
+    const useGeneralCopyButton = card.querySelector("[data-use-general-copy]");
+    const customCopyButton = card.querySelector("[data-custom-copy]");
+
+    function setCopyMode(mode) {
+        if (mode === "general") {
+            contentInput.dataset.customCopy = "";
+            contentInput.value = sharedCopy.value;
+            copyState.textContent = "Using general copy.";
+            useGeneralCopyButton.classList.add("active");
+            customCopyButton.classList.remove("active");
+            contentInput.dispatchEvent(new Event("input", { bubbles: true }));
+        } else {
+            contentInput.dataset.customCopy = "1";
+            copyState.textContent = `Custom copy for ${card.dataset.platform}.`;
+            useGeneralCopyButton.classList.remove("active");
+            customCopyButton.classList.add("active");
+        }
+    }
 
     function syncPreview() {
         const format = formatInput.value;
@@ -323,6 +367,13 @@ document.querySelectorAll("[data-version-card]").forEach((card) => {
         input.addEventListener("input", syncPreview);
         input.addEventListener("change", syncPreview);
     });
+    contentInput.addEventListener("input", () => {
+        if (contentInput.value !== sharedCopy.value && contentInput.dataset.customCopy !== "1") {
+            setCopyMode("custom");
+        }
+    });
+    useGeneralCopyButton.addEventListener("click", () => setCopyMode("general"));
+    customCopyButton.addEventListener("click", () => setCopyMode("custom"));
     mediaInput.addEventListener("change", syncSelectedMediaPreview);
     syncPreview();
 });
