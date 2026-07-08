@@ -128,11 +128,46 @@
             </label>
             {% if media_items %}
             <div class="media-strip">
-                {% for item in media_items %}
-                <span class="media-pill">{{ item.media_type }} · {{ item.original_filename }}</span>
+                {% for media_item in media_items %}
+                <span class="media-pill">{{ media_item.media_type }} · {{ media_item.original_filename }}</span>
                 {% endfor %}
             </div>
             {% endif %}
+        </section>
+
+        <section class="preview-panel compact-preview">
+            <div>
+                <p class="eyebrow">Publication Preview</p>
+                <h2>{{ post.platform }} preview</h2>
+                <p class="muted">Media attached in this card is the media set that will be used for this network version.</p>
+            </div>
+            <article class="social-preview">
+                <div class="preview-topline">
+                    <div>
+                        <strong>{{ post.platform }}</strong>
+                        <span>{{ post.content_format }}</span>
+                    </div>
+                    <span class="status {{ post.status|lower }}">{{ post.status }}</span>
+                </div>
+                <div class="preview-media">
+                    {% if media_items %}
+                        {% for media_item in media_items[:4] %}
+                            {% if media_item.media_type == "video" %}
+                            <video src="{{ url_for('static', filename='uploads/' ~ media_item.filename) }}" controls muted></video>
+                            {% else %}
+                            <img src="{{ url_for('static', filename='uploads/' ~ media_item.filename) }}" alt="{{ media_item.original_filename }}">
+                            {% endif %}
+                        {% endfor %}
+                    {% elif item.image_url %}
+                        <img src="{{ item.image_url }}" alt="">
+                    {% else %}
+                        <div class="preview-media-empty">No media attached yet</div>
+                    {% endif %}
+                </div>
+                <h3>{{ post.title }}</h3>
+                <p>{{ post.content }}</p>
+                <p class="preview-hashtags">{{ post.hashtags }}</p>
+            </article>
         </section>
     </article>
     {% endfor %}

@@ -938,6 +938,85 @@ label {
     overflow-wrap: anywhere;
 }
 
+.preview-panel {
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    display: grid;
+    gap: 16px;
+    padding: 18px;
+}
+
+.compact-preview {
+    background: rgba(8, 6, 17, 0.36);
+}
+
+.social-preview {
+    background: #0f0b18;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
+    display: grid;
+    gap: 14px;
+    max-width: 620px;
+    padding: 16px;
+}
+
+.preview-topline {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.preview-topline div {
+    display: grid;
+    gap: 2px;
+}
+
+.preview-topline strong,
+.social-preview h3 {
+    color: white;
+}
+
+.preview-topline span:not(.status),
+.preview-hashtags {
+    color: var(--accent);
+    font-weight: 800;
+}
+
+.preview-media {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+.preview-media img,
+.preview-media video,
+.preview-media-empty {
+    aspect-ratio: 16 / 10;
+    background: #050812;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--muted);
+    display: grid;
+    object-fit: cover;
+    place-items: center;
+    width: 100%;
+}
+
+.social-preview h3,
+.social-preview p {
+    margin: 0;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.social-preview p {
+    color: var(--text);
+    line-height: 1.45;
+}
+
 @media (max-width: 760px) {
     .topbar,
     .hero,
