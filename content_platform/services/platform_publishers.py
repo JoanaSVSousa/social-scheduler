@@ -1,7 +1,9 @@
 from datetime import datetime, timezone
 import json
 import mimetypes
+import re
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from .media import UPLOAD_DIR
@@ -26,13 +28,14 @@ def publish_to_bluesky(post, media_items):
     credentials = account["credentials"]
     identifier = credentials.get("identifier") or account.get("account_handle")
     app_password = credentials.get("app_password")
-    pds_url = (credentials.get("pds_url") or "https://bsky.social").rstrip("/")
+    pds_url = _normalize_bluesky_pds_url(credentials.get("pds_url"))
     if not identifier or not app_password:
         raise PublicationError("Bluesky needs a handle/email and an app password.")
 
     session = _post_json(
         f"{pds_url}/xrpc/com.atproto.server.createSession",
         {"identifier": identifier, "password": app_password},
+        endpoint_name="createSession",
     )
     access_jwt = session.get("accessJwt")
     repo = session.get("did") or identifier
@@ -57,6 +60,7 @@ def publish_to_bluesky(post, media_items):
             "record": record,
         },
         access_jwt=access_jwt,
+        endpoint_name="createRecord",
     )
     return response.get("uri") or "Bluesky post created"
 
@@ -96,6 +100,7 @@ def _upload_bluesky_blob(pds_url, access_jwt, path):
         data,
         content_type,
         access_jwt,
+        endpoint_name="uploadBlob",
     )
     blob = response.get("blob")
     if not blob:
@@ -103,27 +108,60 @@ def _upload_bluesky_blob(pds_url, access_jwt, path):
     return blob
 
 
-def _post_json(url, payload, access_jwt=None):
+def _normalize_bluesky_pds_url(value):
+    value = (value or "").strip()
+    if not value:
+        return "https://bsky.social"
+    if "://" not in value:
+        value = f"https://{value}"
+
+    parsed = urlparse(value)
+    hostname = (parsed.hostname or "").lower()
+    if hostname in {"bsky.app", "www.bsky.app"}:
+        return "https://bsky.social"
+    if not parsed.scheme.startswith("http") or not hostname:
+        raise PublicationError("Bluesky PDS URL must be a valid URL, for example https://bsky.social.")
+    if parsed.path not in {"", "/"}:
+        raise PublicationError("Bluesky PDS URL must be the server root, for example https://bsky.social, not a profile/post URL.")
+    return f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+
+
+def _post_json(url, payload, access_jwt=None, endpoint_name="request"):
     data = json.dumps(payload).encode("utf-8")
     headers = {"Content-Type": "application/json"}
     if access_jwt:
         headers["Authorization"] = f"Bearer {access_jwt}"
-    return _request_json(Request(url, data=data, headers=headers, method="POST"))
+    return _request_json(Request(url, data=data, headers=headers, method="POST"), endpoint_name)
 
 
-def _post_bytes(url, payload, content_type, access_jwt):
+def _post_bytes(url, payload, content_type, access_jwt, endpoint_name="request"):
     headers = {"Content-Type": content_type, "Authorization": f"Bearer {access_jwt}"}
-    return _request_json(Request(url, data=payload, headers=headers, method="POST"))
+    return _request_json(Request(url, data=payload, headers=headers, method="POST"), endpoint_name)
 
 
-def _request_json(request):
+def _request_json(request, endpoint_name):
     try:
         with urlopen(request, timeout=20) as response:
             return json.loads(response.read().decode("utf-8"))
     except HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
-        raise PublicationError(f"Bluesky API error {exc.code}: {detail}") from exc
+        raise PublicationError(f"Bluesky API {endpoint_name} error {exc.code}: {_clean_error_detail(detail)}") from exc
     except (URLError, TimeoutError) as exc:
-        raise PublicationError(f"Bluesky API request failed: {exc}") from exc
+        raise PublicationError(f"Bluesky API {endpoint_name} request failed: {exc}") from exc
     except json.JSONDecodeError as exc:
-        raise PublicationError("Bluesky API returned an invalid JSON response.") from exc
+        raise PublicationError(f"Bluesky API {endpoint_name} returned an invalid JSON response.") from exc
+
+
+def _clean_error_detail(detail):
+    try:
+        payload = json.loads(detail)
+    except json.JSONDecodeError:
+        payload = None
+    if isinstance(payload, dict):
+        return payload.get("message") or payload.get("error") or json.dumps(payload)
+
+    text = re.sub(r"<[^>]+>", " ", detail)
+    text = re.sub(r"\s+", " ", text).strip()
+    if "404: Not Found" in text or "Error 404" in text:
+        return "Endpoint not found. Check that Bluesky PDS URL is https://bsky.social, not bsky.app or a profile URL."
+    return text[:500] or "No response body."

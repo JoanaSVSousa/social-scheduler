@@ -18,76 +18,76 @@ SOCIAL_ACCOUNT_SCHEMAS = {
         "description": "Meta/Instagram publishing usually needs a professional IG account, a linked Facebook Page, and a long-lived access token.",
         "auth_options": [("meta_graph", "Meta Graph API")],
         "fields": [
-            {"name": "instagram_business_id", "label": "Instagram Business ID", "placeholder": "1784..."},
-            {"name": "facebook_page_id", "label": "Linked Facebook Page ID", "placeholder": "Page ID"},
-            {"name": "access_token", "label": "Long-lived Access Token", "placeholder": "Paste Meta access token"},
+            {"name": "instagram_business_id", "label": "Instagram Business ID", "placeholder": "1784...", "example": "Example: 17841400000000000"},
+            {"name": "facebook_page_id", "label": "Linked Facebook Page ID", "placeholder": "Page ID", "example": "Example: 123456789012345"},
+            {"name": "access_token", "label": "Long-lived Access Token", "placeholder": "Paste Meta access token", "example": "Starts with EAA..."},
         ],
     },
     "Facebook": {
         "description": "Facebook Page publishing needs the Page ID and a Page access token with publishing permissions.",
         "auth_options": [("meta_graph", "Meta Graph API")],
         "fields": [
-            {"name": "page_id", "label": "Page ID", "placeholder": "Facebook Page ID"},
-            {"name": "access_token", "label": "Page Access Token", "placeholder": "Paste Page access token"},
-            {"name": "app_id", "label": "App ID", "placeholder": "Optional Meta App ID"},
-            {"name": "app_secret", "label": "App Secret", "placeholder": "Optional Meta App Secret"},
+            {"name": "page_id", "label": "Page ID", "placeholder": "Facebook Page ID", "example": "Example: 123456789012345"},
+            {"name": "access_token", "label": "Page Access Token", "placeholder": "Paste Page access token", "example": "Starts with EAA..."},
+            {"name": "app_id", "label": "App ID", "placeholder": "Optional Meta App ID", "example": "Numeric Meta app id"},
+            {"name": "app_secret", "label": "App Secret", "placeholder": "Optional Meta App Secret", "example": "Meta app secret string"},
         ],
     },
     "LinkedIn": {
         "description": "LinkedIn publishing needs OAuth credentials and, for company posts, the organization ID/URN.",
         "auth_options": [("oauth", "LinkedIn OAuth")],
         "fields": [
-            {"name": "organization_id", "label": "Organization ID / URN", "placeholder": "urn:li:organization:..."},
-            {"name": "access_token", "label": "Access Token", "placeholder": "Paste LinkedIn access token"},
-            {"name": "refresh_token", "label": "Refresh Token", "placeholder": "Optional refresh token"},
+            {"name": "organization_id", "label": "Organization ID / URN", "placeholder": "urn:li:organization:...", "example": "Example: urn:li:organization:123456"},
+            {"name": "access_token", "label": "Access Token", "placeholder": "Paste LinkedIn access token", "example": "OAuth access token"},
+            {"name": "refresh_token", "label": "Refresh Token", "placeholder": "Optional refresh token", "example": "OAuth refresh token, if issued"},
         ],
     },
     "X": {
         "description": "X can require OAuth 1.0a user tokens for posting, plus bearer/API keys depending on the endpoint.",
         "auth_options": [("oauth1", "OAuth 1.0a user tokens"), ("oauth2", "OAuth 2.0")],
         "fields": [
-            {"name": "api_key", "label": "API Key", "placeholder": "Consumer/API key"},
-            {"name": "api_secret", "label": "API Secret", "placeholder": "Consumer/API secret"},
-            {"name": "access_token", "label": "Access Token", "placeholder": "User access token"},
-            {"name": "access_token_secret", "label": "Access Token Secret", "placeholder": "User access token secret"},
-            {"name": "bearer_token", "label": "Bearer Token", "placeholder": "Optional bearer token"},
+            {"name": "api_key", "label": "API Key", "placeholder": "Consumer/API key", "example": "From X Developer Portal"},
+            {"name": "api_secret", "label": "API Secret", "placeholder": "Consumer/API secret", "example": "Also called API Key Secret"},
+            {"name": "access_token", "label": "Access Token", "placeholder": "User access token", "example": "OAuth 1.0a user token"},
+            {"name": "access_token_secret", "label": "Access Token Secret", "placeholder": "User access token secret", "example": "OAuth 1.0a user token secret"},
+            {"name": "bearer_token", "label": "Bearer Token", "placeholder": "Optional bearer token", "example": "Usually starts with AAAAA..."},
         ],
     },
     "Threads": {
         "description": "Threads publishing uses Meta/Threads credentials: a Threads user ID and access token.",
         "auth_options": [("threads_api", "Threads API")],
         "fields": [
-            {"name": "threads_user_id", "label": "Threads User ID", "placeholder": "Threads user ID"},
-            {"name": "access_token", "label": "Access Token", "placeholder": "Paste Threads access token"},
+            {"name": "threads_user_id", "label": "Threads User ID", "placeholder": "Threads user ID", "example": "Numeric Threads user id"},
+            {"name": "access_token", "label": "Access Token", "placeholder": "Paste Threads access token", "example": "Threads/Meta access token"},
         ],
     },
     "Bluesky": {
-        "description": "Bluesky is the lightest first integration: use the account handle/email and an app password, not your main password.",
+        "description": "Bluesky is the lightest first integration: use the account handle/email and an app password, not your main password. Leave PDS URL as https://bsky.social unless you use a custom PDS; do not paste a bsky.app profile URL.",
         "auth_options": [("app_password", "Handle + app password")],
         "fields": [
-            {"name": "identifier", "label": "Handle or Email", "placeholder": "squaredpotato.bsky.social"},
-            {"name": "app_password", "label": "App Password", "placeholder": "Paste Bluesky app password"},
-            {"name": "pds_url", "label": "PDS URL", "placeholder": "https://bsky.social"},
+            {"name": "identifier", "label": "Handle or Email", "placeholder": "squaredpotato.bsky.social", "example": "Example: squaredpotato.bsky.social"},
+            {"name": "app_password", "label": "App Password", "placeholder": "Paste Bluesky app password", "example": "Generated in Bluesky settings, not your main password"},
+            {"name": "pds_url", "label": "PDS URL", "placeholder": "https://bsky.social", "example": "Use https://bsky.social, not bsky.app"},
         ],
     },
     "YouTube Shorts": {
         "description": "YouTube uploads use Google OAuth. A refresh token is normally needed for scheduled publishing.",
         "auth_options": [("google_oauth", "Google OAuth")],
         "fields": [
-            {"name": "channel_id", "label": "Channel ID", "placeholder": "YouTube channel ID"},
-            {"name": "client_id", "label": "OAuth Client ID", "placeholder": "Google OAuth client ID"},
-            {"name": "client_secret", "label": "OAuth Client Secret", "placeholder": "Google OAuth client secret"},
-            {"name": "refresh_token", "label": "Refresh Token", "placeholder": "Google refresh token"},
+            {"name": "channel_id", "label": "Channel ID", "placeholder": "YouTube channel ID", "example": "Example: UCxxxxxxxxxxxxxxxx"},
+            {"name": "client_id", "label": "OAuth Client ID", "placeholder": "Google OAuth client ID", "example": "Ends with .apps.googleusercontent.com"},
+            {"name": "client_secret", "label": "OAuth Client Secret", "placeholder": "Google OAuth client secret", "example": "From Google Cloud OAuth client"},
+            {"name": "refresh_token", "label": "Refresh Token", "placeholder": "Google refresh token", "example": "Long token returned by OAuth consent"},
         ],
     },
     "TikTok": {
         "description": "TikTok publishing uses a developer app plus access tokens for the connected creator account.",
         "auth_options": [("tiktok_api", "TikTok API")],
         "fields": [
-            {"name": "client_key", "label": "Client Key", "placeholder": "TikTok client key"},
-            {"name": "client_secret", "label": "Client Secret", "placeholder": "TikTok client secret"},
-            {"name": "access_token", "label": "Access Token", "placeholder": "TikTok access token"},
-            {"name": "open_id", "label": "Open ID", "placeholder": "Connected account open_id"},
+            {"name": "client_key", "label": "Client Key", "placeholder": "TikTok client key", "example": "From TikTok developer app"},
+            {"name": "client_secret", "label": "Client Secret", "placeholder": "TikTok client secret", "example": "From TikTok developer app"},
+            {"name": "access_token", "label": "Access Token", "placeholder": "TikTok access token", "example": "Connected creator access token"},
+            {"name": "open_id", "label": "Open ID", "placeholder": "Connected account open_id", "example": "User open_id returned by TikTok OAuth"},
         ],
     },
 }
@@ -96,9 +96,9 @@ DEFAULT_SOCIAL_ACCOUNT_SCHEMA = {
     "description": "Store the credentials required by this platform.",
     "auth_options": [("api_keys", "API keys / tokens")],
     "fields": [
-        {"name": "api_key", "label": "API Key", "placeholder": "Paste API key"},
-        {"name": "api_secret", "label": "API Secret", "placeholder": "Paste API secret"},
-        {"name": "access_token", "label": "Access Token", "placeholder": "Paste access token"},
+        {"name": "api_key", "label": "API Key", "placeholder": "Paste API key", "example": "API key from developer dashboard"},
+        {"name": "api_secret", "label": "API Secret", "placeholder": "Paste API secret", "example": "API secret from developer dashboard"},
+        {"name": "access_token", "label": "Access Token", "placeholder": "Paste access token", "example": "OAuth access token"},
     ],
 }
 
@@ -122,7 +122,7 @@ def save_social_account(platform, account_label, account_handle, auth_type, cred
     existing = get_social_account(platform)
     credentials = _stored_credentials(existing, fail_closed=True)
     for field_name in credential_field_names(platform):
-        value = credential_values.get(field_name, "").strip()
+        value = _normalize_credential_value(platform, field_name, credential_values.get(field_name, ""))
         if value:
             credentials[field_name] = value
 
@@ -173,6 +173,15 @@ def credential_schema_for_platform(platform):
 
 def credential_field_names(platform):
     return [field["name"] for field in credential_schema_for_platform(platform)["fields"]]
+
+
+def _normalize_credential_value(platform, field_name, value):
+    value = (value or "").strip()
+    if platform == "Bluesky" and field_name == "pds_url":
+        normalized = value.lower().rstrip("/")
+        if normalized in {"", "bsky.app", "www.bsky.app", "https://bsky.app", "https://www.bsky.app"}:
+            return "https://bsky.social"
+    return value
 
 
 def decrypt_credentials_for_publisher(platform):
