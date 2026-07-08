@@ -7,8 +7,8 @@ from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from .media import UPLOAD_DIR
+from .rich_text import compose_publication_text, detect_social_entities, utf8_byte_range
 from .social_accounts import decrypt_credentials_for_publisher
-from ..models import truncate_content_for_platform
 
 
 class PublicationError(Exception):
@@ -49,6 +49,10 @@ def publish_to_bluesky(post, media_items):
         "text": text,
         "createdAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     }
+    facets = _build_bluesky_facets(text)
+    if facets:
+        record["facets"] = facets
+
     image_embed = _build_bluesky_image_embed(pds_url, access_jwt, media_items)
     if image_embed:
         record["embed"] = image_embed
@@ -67,15 +71,36 @@ def publish_to_bluesky(post, media_items):
 
 
 def _compose_bluesky_text(post):
-    hashtags = post["hashtags"].strip()
-    content = truncate_content_for_platform("Bluesky", post["content"], hashtags)
-    pieces = [content, hashtags]
-    text = "\n\n".join(piece for piece in pieces if piece)
+    text = compose_publication_text("Bluesky", post["content"], post["hashtags"])
     if not text:
         raise PublicationError("Post content is empty. The title is internal and is not published.")
     if len(text) > 300:
         raise PublicationError("Bluesky hashtags are too long to fit in a 300-character post.")
     return text
+
+
+def _build_bluesky_facets(text):
+    """Tell Bluesky which text ranges are clickable links and valid hashtags."""
+    facets = []
+    for entity in detect_social_entities(text):
+        feature = _bluesky_facet_feature(entity)
+        if not feature:
+            continue
+        facets.append(
+            {
+                "index": utf8_byte_range(text, entity["start"], entity["end"]),
+                "features": [feature],
+            }
+        )
+    return facets
+
+
+def _bluesky_facet_feature(entity):
+    if entity["type"] == "link":
+        return {"$type": "app.bsky.richtext.facet#link", "uri": entity["value"]}
+    if entity["type"] == "hashtag":
+        return {"$type": "app.bsky.richtext.facet#tag", "tag": entity["value"]}
+    return None
 
 
 def _build_bluesky_image_embed(pds_url, access_jwt, media_items):
