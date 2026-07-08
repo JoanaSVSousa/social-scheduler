@@ -996,6 +996,25 @@ label {
         var(--surface);
 }
 
+.general-format-panel {
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    display: grid;
+    gap: 12px;
+    padding: 14px;
+}
+
+.general-format-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.preview-network-picker {
+    margin-top: 10px;
+}
+
 .version-layout {
     align-items: start;
     display: grid;

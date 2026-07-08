@@ -413,7 +413,12 @@ def edit_rss_article(rss_item_id):
         for post in posts:
             prefix = f"post_{post['id']}_"
             status = _override_or_general(prefix, "status", post["status"], general_values["status"])
-            content_format = request.form.get(prefix + "content_format", post["content_format"])
+            general_content_format = request.form.get(f"general_content_format_{post['id']}", post["content_format"])
+            content_format = (
+                request.form.get(prefix + "content_format", post["content_format"])
+                if _uses_field_override(prefix, "format")
+                else general_content_format
+            )
             if status not in STATUSES:
                 abort(400)
             if content_format not in PLATFORM_CONTENT_FORMATS.get(post["platform"], []):
@@ -435,7 +440,12 @@ def edit_rss_article(rss_item_id):
         update_rss_group_posts(updates)
         for post in posts:
             prefix = f"post_{post['id']}_"
-            content_format = request.form.get(prefix + "content_format", post["content_format"])
+            general_content_format = request.form.get(f"general_content_format_{post['id']}", post["content_format"])
+            content_format = (
+                request.form.get(prefix + "content_format", post["content_format"])
+                if _uses_field_override(prefix, "format")
+                else general_content_format
+            )
             schedule_dates = _schedule_dates_from_prefixed_form(prefix) if _uses_field_override(prefix, "schedule") else general_schedule_dates
             replace_schedules(post["id"], schedule_dates)
             _reset_file_streams(general_media_files)

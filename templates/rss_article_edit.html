@@ -66,6 +66,7 @@
             <span class="status draft">Inherited by default</span>
         </div>
 
+        <div class="version-layout">
         <div class="version-fields">
             <label>
                 Title
@@ -100,6 +101,30 @@
                     <input data-general-field="hashtags" name="general_hashtags" maxlength="400" value="{{ general_defaults.hashtags }}">
                 </label>
             </div>
+
+            <section class="general-format-panel">
+                <div>
+                    <strong>Post type by network</strong>
+                    <p class="field-help">These formats become the default for each selected network. Open a network tab only when that network needs a different format.</p>
+                </div>
+                <div class="general-format-grid">
+                    {% for post in posts %}
+                    <label>
+                        {{ post.platform }}
+                        <select
+                            name="general_content_format_{{ post.id }}"
+                            data-general-format
+                            data-general-format-post-id="{{ post.id }}"
+                            data-general-format-platform="{{ post.platform }}"
+                        >
+                            {% for format in content_formats[post.platform] %}
+                            <option value="{{ format }}" {% if post.content_format == format %}selected{% endif %}>{{ format }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    {% endfor %}
+                </div>
+            </section>
 
             <label>
                 Recycling dates
@@ -137,6 +162,41 @@
                 </label>
                 <div class="media-strip" data-general-media-list></div>
             </section>
+        </div>
+
+        <aside class="preview-panel compact-preview version-preview-panel">
+            <div>
+                <p class="eyebrow">Default Preview</p>
+                <h2>General preview</h2>
+                <label class="preview-network-picker">
+                    Preview as
+                    <select data-general-preview-platform>
+                        {% for post in posts %}
+                        <option value="{{ post.platform }}">{{ post.platform }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+            </div>
+            <article data-general-preview-card class="social-preview">
+                <div class="preview-topline">
+                    <div>
+                        <strong data-general-preview-platform-output>{{ posts[0].platform }}</strong>
+                        <span data-general-preview-format-output>{{ posts[0].content_format }}</span>
+                    </div>
+                    <span data-general-preview-status-output class="status {{ general_defaults.status|lower }}">{{ general_defaults.status }}</span>
+                </div>
+                <div data-general-preview-media class="preview-media">
+                    {% if item.image_url %}
+                    <img src="{{ item.image_url }}" alt="">
+                    {% else %}
+                    <div class="preview-media-empty">No media attached yet</div>
+                    {% endif %}
+                </div>
+                <h3 data-general-preview-title-output>{{ general_defaults.title }}</h3>
+                <p data-general-preview-content-output>{{ general_defaults.content }}</p>
+                <p data-general-preview-hashtags-output class="preview-hashtags">{{ general_defaults.hashtags }}</p>
+            </article>
+        </aside>
         </div>
     </article>
     {% endif %}
@@ -184,7 +244,12 @@
         <div class="form-row compact-controls">
             <label>
                 Format
-                <select data-preview-format name="{{ prefix }}content_format">
+                <span class="field-label-with-tabs">
+                    Format
+                    <span class="inheritance-state" data-inheritance-state="format">{% if overrides.format %}Custom {{ post.platform }}{% else %}General{% endif %}</span>
+                </span>
+                <input type="hidden" name="{{ prefix }}override_format" value="{% if overrides.format %}1{% else %}0{% endif %}" data-override-flag="format">
+                <select data-preview-format data-network-field="content_format" name="{{ prefix }}content_format">
                     {% for format in content_formats[post.platform] %}
                     <option value="{{ format }}" {% if post.content_format == format %}selected{% endif %}>{{ format }}</option>
                     {% endfor %}
@@ -326,6 +391,27 @@
 <script>
 const formatRules = {{ format_rules|tojson }};
 
+function previewClassForFormat(format) {
+    const normalized = format.toLowerCase();
+    if (normalized.includes("story") || normalized.includes("reel") || normalized.includes("short") || normalized.includes("tiktok")) {
+        return "preview-vertical";
+    }
+    if (normalized.includes("video")) {
+        return "preview-video";
+    }
+    if (normalized.includes("image") || normalized.includes("carousel")) {
+        return "preview-image";
+    }
+    if (normalized.includes("text") || normalized.includes("thread")) {
+        return "preview-text";
+    }
+    return "preview-feed";
+}
+
+function previewCopyClassForFormat(format) {
+    return format.toLowerCase().includes("story") ? "preview-no-copy" : "";
+}
+
 document.querySelectorAll("[data-target-version]").forEach((button) => {
     button.addEventListener("click", () => {
         document.querySelectorAll("[data-target-version]").forEach((item) => item.classList.remove("active"));
@@ -342,7 +428,10 @@ document.querySelectorAll("[data-general-field]").forEach((field) => {
 });
 
 function overrideGroupForField(fieldName) {
-    return ["scheduled_date", "scheduled_time", "schedule_dates"].includes(fieldName) ? "schedule" : fieldName;
+    if (["scheduled_date", "scheduled_time", "schedule_dates"].includes(fieldName)) {
+        return "schedule";
+    }
+    return fieldName === "content_format" ? "format" : fieldName;
 }
 
 function hasOverride(card, fieldName) {
@@ -397,9 +486,82 @@ function applyGeneralValue(fieldName, value) {
 }
 
 document.querySelectorAll("[data-general-field]").forEach((field) => {
-    field.addEventListener("input", () => applyGeneralValue(field.dataset.generalField, field.value));
-    field.addEventListener("change", () => applyGeneralValue(field.dataset.generalField, field.value));
+    field.addEventListener("input", () => {
+        applyGeneralValue(field.dataset.generalField, field.value);
+        syncGeneralPreview();
+    });
+    field.addEventListener("change", () => {
+        applyGeneralValue(field.dataset.generalField, field.value);
+        syncGeneralPreview();
+    });
 });
+
+function selectedGeneralFormat(platform) {
+    return document.querySelector(`[data-general-format-platform="${platform}"]`)?.value || "Feed Post";
+}
+
+function syncGeneralFormatToNetwork(formatSelect) {
+    const card = document.querySelector(`#version-${formatSelect.dataset.generalFormatPostId}`);
+    if (!card || hasOverride(card, "format")) {
+        return;
+    }
+    const networkFormat = card.querySelector('[data-network-field="content_format"]');
+    if (networkFormat) {
+        networkFormat.dataset.syncingGeneral = "1";
+        networkFormat.value = formatSelect.value;
+        networkFormat.dispatchEvent(new Event("change", { bubbles: true }));
+        delete networkFormat.dataset.syncingGeneral;
+    }
+}
+
+function syncGeneralPreviewMediaFromFiles(files) {
+    const mediaOutput = document.querySelector("[data-general-preview-media]");
+    if (!mediaOutput) {
+        return;
+    }
+    const selectedFiles = Array.from(files || []);
+    if (!selectedFiles.length) {
+        return;
+    }
+
+    mediaOutput.innerHTML = "";
+    selectedFiles.slice(0, 4).forEach((file) => {
+        const url = URL.createObjectURL(file);
+        const element = file.type.startsWith("video/") ? document.createElement("video") : document.createElement("img");
+        element.src = url;
+        if (element.tagName === "VIDEO") {
+            element.controls = true;
+            element.muted = true;
+        }
+        element.onload = () => URL.revokeObjectURL(url);
+        mediaOutput.appendChild(element);
+    });
+}
+
+function syncGeneralPreview() {
+    const platform = document.querySelector("[data-general-preview-platform]")?.value || "";
+    const format = selectedGeneralFormat(platform);
+    const status = generalFields.status?.value || "Draft";
+    const previewCard = document.querySelector("[data-general-preview-card]");
+    document.querySelector("[data-general-preview-platform-output]").textContent = platform || "General";
+    document.querySelector("[data-general-preview-format-output]").textContent = format;
+    document.querySelector("[data-general-preview-title-output]").textContent = generalFields.title?.value.trim() || "Untitled post";
+    document.querySelector("[data-general-preview-content-output]").textContent = generalFields.content?.value.trim() || "Write the post content to preview it here.";
+    document.querySelector("[data-general-preview-hashtags-output]").textContent = generalFields.hashtags?.value.trim() || "";
+    const statusOutput = document.querySelector("[data-general-preview-status-output]");
+    statusOutput.textContent = status;
+    statusOutput.className = `status ${status.toLowerCase()}`;
+    previewCard.className = `social-preview ${previewClassForFormat(format)} ${previewCopyClassForFormat(format)}`;
+}
+
+document.querySelectorAll("[data-general-format]").forEach((field) => {
+    field.addEventListener("change", () => {
+        syncGeneralFormatToNetwork(field);
+        syncGeneralPreview();
+    });
+});
+
+document.querySelector("[data-general-preview-platform]")?.addEventListener("change", syncGeneralPreview);
 
 document.querySelector("[data-general-media-input]")?.addEventListener("change", (event) => {
     const list = document.querySelector("[data-general-media-list]");
@@ -413,6 +575,7 @@ document.querySelector("[data-general-media-input]")?.addEventListener("change",
         pill.textContent = `${file.type.startsWith("video/") ? "video" : "image"} · ${file.name}`;
         list.appendChild(pill);
     });
+    syncGeneralPreviewMediaFromFiles(event.target.files);
 });
 
 document.querySelectorAll("[data-version-card]").forEach((card) => {
@@ -498,7 +661,7 @@ document.querySelectorAll("[data-version-card]").forEach((card) => {
         });
     }
 
-    [titleInput, contentInput, statusInput, hashtagsInput].forEach((input) => {
+    [titleInput, contentInput, formatInput, statusInput, hashtagsInput].forEach((input) => {
         input.addEventListener("input", () => {
             if (!input.dataset.syncingGeneral) {
                 setOverride(card, overrideGroupForField(input.dataset.networkField), true);
@@ -523,8 +686,12 @@ document.querySelectorAll("[data-version-card]").forEach((card) => {
         });
     });
     card.querySelector("[data-reset-to-general]")?.addEventListener("click", () => {
-        ["title", "content", "hashtags", "status", "schedule"].forEach((fieldName) => setOverride(card, fieldName, false));
+        ["title", "content", "hashtags", "format", "status", "schedule"].forEach((fieldName) => setOverride(card, fieldName, false));
         syncInheritedFieldsFromGeneral(card);
+        const generalFormat = document.querySelector(`[data-general-format-post-id="${card.id.replace("version-", "")}"]`);
+        if (generalFormat) {
+            formatInput.value = generalFormat.value;
+        }
         syncPreview();
     });
     [titleInput, contentInput, formatInput, statusInput, hashtagsInput].forEach((input) => {
@@ -534,5 +701,6 @@ document.querySelectorAll("[data-version-card]").forEach((card) => {
     mediaInput.addEventListener("change", syncSelectedMediaPreview);
     syncPreview();
 });
+syncGeneralPreview();
 </script>
 {% endblock %}
