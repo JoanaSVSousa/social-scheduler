@@ -8,11 +8,12 @@
     </div>
 </div>
 
-<form class="form" method="post" enctype="multipart/form-data">
+<form class="form post-editor-form" method="post" enctype="multipart/form-data">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     {% if post %}
     <input type="hidden" name="post_id" value="{{ post.id }}">
     {% endif %}
+    <div class="post-editor-fields">
     <label>
         Title
         <input name="title" maxlength="120" required value="{{ post.title if post else '' }}">
@@ -110,7 +111,13 @@
         {% endif %}
     </section>
 
-    <section class="preview-panel">
+    <div class="form-actions">
+        <button class="button primary" type="submit">{{ action }} Post</button>
+        <a class="button" href="{{ url_for('main.posts') }}">Cancel</a>
+    </div>
+    </div>
+
+    <aside class="preview-panel post-preview-panel">
         <div>
             <p class="eyebrow">Publication Preview</p>
             <h2>How this post will appear</h2>
@@ -144,12 +151,7 @@
             <p id="preview-content">{{ post.content if post else 'Write the post content to preview it here.' }}</p>
             <p class="preview-hashtags" id="preview-hashtags">{{ post.hashtags if post else '' }}</p>
         </article>
-    </section>
-
-    <div class="form-actions">
-        <button class="button primary" type="submit">{{ action }} Post</button>
-        <a class="button" href="{{ url_for('main.posts') }}">Cancel</a>
-    </div>
+    </aside>
 </form>
 
 <script>

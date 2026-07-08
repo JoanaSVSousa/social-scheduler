@@ -538,6 +538,23 @@ textarea {
     overflow: hidden;
 }
 
+.post-editor-form {
+    align-items: start;
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+    max-width: none;
+}
+
+.post-editor-fields {
+    display: grid;
+    gap: 18px;
+}
+
+.post-preview-panel,
+.version-preview-panel {
+    position: sticky;
+    top: 92px;
+}
+
 label {
     color: var(--muted);
     display: grid;
@@ -869,6 +886,18 @@ label {
     justify-content: space-between;
 }
 
+.version-layout {
+    align-items: start;
+    display: grid;
+    gap: 18px;
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+}
+
+.version-fields {
+    display: grid;
+    gap: 16px;
+}
+
 .sticky-actions {
     background: rgba(8, 6, 17, 0.84);
     backdrop-filter: blur(14px);
@@ -962,6 +991,11 @@ label {
     padding: 16px;
 }
 
+.version-preview-panel .social-preview,
+.post-preview-panel .social-preview {
+    max-width: none;
+}
+
 .preview-topline {
     align-items: center;
     display: flex;
@@ -1038,8 +1072,15 @@ label {
     .filters,
     .form-row,
     .source-media-preview,
-    .calendar-grid {
+    .calendar-grid,
+    .post-editor-form,
+    .version-layout {
         grid-template-columns: 1fr;
+    }
+
+    .post-preview-panel,
+    .version-preview-panel {
+        position: static;
     }
 
     .calendar-weekday {

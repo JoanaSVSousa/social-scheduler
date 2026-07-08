@@ -48,7 +48,7 @@
     {% set media_items = media_by_post.get(post.id, []) %}
     {% set scheduled_parts = datetime_parts(post.scheduled_at) %}
     {% set repeat_parts = datetime_parts('') %}
-    <article class="version-card">
+    <article class="version-card" data-version-card>
         <div class="version-card-header">
             <div>
                 <p class="eyebrow">{{ post.platform }}</p>
@@ -57,20 +57,22 @@
             <span class="status {{ post.status|lower }}">{{ post.status }}</span>
         </div>
 
+        <div class="version-layout">
+        <div class="version-fields">
         <label>
             Title
-            <input name="{{ prefix }}title" maxlength="120" required value="{{ post.title }}">
+            <input data-preview-title name="{{ prefix }}title" maxlength="120" required value="{{ post.title }}">
         </label>
 
         <label>
             Content
-            <textarea name="{{ prefix }}content" rows="8" maxlength="2200" required>{{ post.content }}</textarea>
+            <textarea data-preview-content name="{{ prefix }}content" rows="8" maxlength="2200" required>{{ post.content }}</textarea>
         </label>
 
         <div class="form-row">
             <label>
                 Format
-                <select name="{{ prefix }}content_format">
+                <select data-preview-format name="{{ prefix }}content_format">
                     {% for format in content_formats[post.platform] %}
                     <option value="{{ format }}" {% if post.content_format == format %}selected{% endif %}>{{ format }}</option>
                     {% endfor %}
@@ -78,7 +80,7 @@
             </label>
             <label>
                 Status
-                <select name="{{ prefix }}status">
+                <select data-preview-status name="{{ prefix }}status">
                     {% for status in statuses %}
                     <option value="{{ status }}" {% if post.status == status %}selected{% endif %}>{{ status }}</option>
                     {% endfor %}
@@ -97,7 +99,7 @@
             </label>
             <label>
                 Hashtags
-                <input name="{{ prefix }}hashtags" maxlength="400" value="{{ post.hashtags }}">
+                <input data-preview-hashtags name="{{ prefix }}hashtags" maxlength="400" value="{{ post.hashtags }}">
             </label>
         </div>
 
@@ -133,7 +135,7 @@
             </div>
             <label class="upload-box">
                 Upload media
-                <input type="file" name="{{ prefix }}media_files" multiple accept="image/*,video/*">
+                <input data-preview-media-input type="file" name="{{ prefix }}media_files" multiple accept="image/*,video/*">
                 <span>Images and videos attached here only apply to this network version.</span>
             </label>
             {% if media_items %}
@@ -144,8 +146,9 @@
             </div>
             {% endif %}
         </section>
+        </div>
 
-        <section class="preview-panel compact-preview">
+        <aside class="preview-panel compact-preview version-preview-panel">
             <div>
                 <p class="eyebrow">Publication Preview</p>
                 <h2>{{ post.platform }} preview</h2>
@@ -155,11 +158,11 @@
                 <div class="preview-topline">
                     <div>
                         <strong>{{ post.platform }}</strong>
-                        <span>{{ post.content_format }}</span>
+                        <span data-preview-format-output>{{ post.content_format }}</span>
                     </div>
-                    <span class="status {{ post.status|lower }}">{{ post.status }}</span>
+                    <span data-preview-status-output class="status {{ post.status|lower }}">{{ post.status }}</span>
                 </div>
-                <div class="preview-media">
+                <div data-preview-media class="preview-media">
                     {% if media_items %}
                         {% for media_item in media_items[:4] %}
                             {% if media_item.media_type == "video" %}
@@ -174,11 +177,12 @@
                         <div class="preview-media-empty">No media attached yet</div>
                     {% endif %}
                 </div>
-                <h3>{{ post.title }}</h3>
-                <p>{{ post.content }}</p>
-                <p class="preview-hashtags">{{ post.hashtags }}</p>
+                <h3 data-preview-title-output>{{ post.title }}</h3>
+                <p data-preview-content-output>{{ post.content }}</p>
+                <p data-preview-hashtags-output class="preview-hashtags">{{ post.hashtags }}</p>
             </article>
-        </section>
+        </aside>
+        </div>
     </article>
     {% endfor %}
 
@@ -187,4 +191,56 @@
         <a class="button" href="{{ url_for('main.posts') }}">Back to posts</a>
     </div>
 </form>
+<script>
+document.querySelectorAll("[data-version-card]").forEach((card) => {
+    const titleInput = card.querySelector("[data-preview-title]");
+    const contentInput = card.querySelector("[data-preview-content]");
+    const formatInput = card.querySelector("[data-preview-format]");
+    const statusInput = card.querySelector("[data-preview-status]");
+    const hashtagsInput = card.querySelector("[data-preview-hashtags]");
+    const mediaInput = card.querySelector("[data-preview-media-input]");
+    const titleOutput = card.querySelector("[data-preview-title-output]");
+    const contentOutput = card.querySelector("[data-preview-content-output]");
+    const formatOutput = card.querySelector("[data-preview-format-output]");
+    const statusOutput = card.querySelector("[data-preview-status-output]");
+    const hashtagsOutput = card.querySelector("[data-preview-hashtags-output]");
+    const mediaOutput = card.querySelector("[data-preview-media]");
+
+    function syncPreview() {
+        titleOutput.textContent = titleInput.value.trim() || "Untitled post";
+        contentOutput.textContent = contentInput.value.trim() || "Write the post content to preview it here.";
+        formatOutput.textContent = formatInput.value;
+        statusOutput.textContent = statusInput.value;
+        statusOutput.className = `status ${statusInput.value.toLowerCase()}`;
+        hashtagsOutput.textContent = hashtagsInput.value.trim();
+    }
+
+    function syncSelectedMediaPreview() {
+        const files = Array.from(mediaInput.files || []);
+        if (!files.length) {
+            return;
+        }
+
+        mediaOutput.innerHTML = "";
+        files.slice(0, 4).forEach((file) => {
+            const url = URL.createObjectURL(file);
+            const element = file.type.startsWith("video/") ? document.createElement("video") : document.createElement("img");
+            element.src = url;
+            if (element.tagName === "VIDEO") {
+                element.controls = true;
+                element.muted = true;
+            }
+            element.onload = () => URL.revokeObjectURL(url);
+            mediaOutput.appendChild(element);
+        });
+    }
+
+    [titleInput, contentInput, formatInput, statusInput, hashtagsInput].forEach((input) => {
+        input.addEventListener("input", syncPreview);
+        input.addEventListener("change", syncPreview);
+    });
+    mediaInput.addEventListener("change", syncSelectedMediaPreview);
+    syncPreview();
+});
+</script>
 {% endblock %}
