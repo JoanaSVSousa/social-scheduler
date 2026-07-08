@@ -55,10 +55,17 @@
         </label>
     </div>
 
-    <label>
-        Scheduled date and time
-        <input type="datetime-local" name="scheduled_at" id="scheduled-at" value="{{ post.scheduled_at if post else '' }}">
-    </label>
+    {% set scheduled_parts = datetime_parts(post.scheduled_at if post else '') %}
+    <div class="form-row">
+        <label>
+            Scheduled date
+            <input type="date" name="scheduled_date" id="scheduled-date" value="{{ scheduled_parts.date }}">
+        </label>
+        <label>
+            Scheduled time
+            <input type="time" name="scheduled_time" id="scheduled-time" value="{{ scheduled_parts.time }}">
+        </label>
+    </div>
 
     <label>
         Recycling schedule dates
@@ -152,7 +159,8 @@ const formatGuides = {{ format_guides|tojson }};
 const platformSelect = document.querySelector("#platform-select");
 const formatSelect = document.querySelector("#format-select");
 const statusSelect = document.querySelector("#status-select");
-const scheduledAt = document.querySelector("#scheduled-at");
+const scheduledDate = document.querySelector("#scheduled-date");
+const scheduledTime = document.querySelector("#scheduled-time");
 const titleInput = document.querySelector("input[name='title']");
 const contentInput = document.querySelector("textarea[name='content']");
 const hashtagsInput = document.querySelector("input[name='hashtags']");
@@ -228,7 +236,8 @@ platformSelect.addEventListener("change", syncFormats);
 formatSelect.addEventListener("change", syncGuides);
 formatSelect.addEventListener("change", syncPreview);
 statusSelect.addEventListener("change", () => {
-    scheduledAt.required = statusSelect.value === "Scheduled";
+    scheduledDate.required = statusSelect.value === "Scheduled";
+    scheduledTime.required = statusSelect.value === "Scheduled";
     syncPreview();
 });
 titleInput.addEventListener("input", syncPreview);
@@ -236,7 +245,8 @@ contentInput.addEventListener("input", syncPreview);
 hashtagsInput.addEventListener("input", syncPreview);
 mediaInput.addEventListener("change", syncSelectedMediaPreview);
 syncFormats();
-scheduledAt.required = statusSelect.value === "Scheduled";
+scheduledDate.required = statusSelect.value === "Scheduled";
+scheduledTime.required = statusSelect.value === "Scheduled";
 syncPreview();
 </script>
 {% endblock %}

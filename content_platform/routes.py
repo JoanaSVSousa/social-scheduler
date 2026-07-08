@@ -335,7 +335,7 @@ def edit_rss_article(rss_item_id):
                     "hashtags": request.form.get(prefix + "hashtags", "").strip()[:400],
                     "content_format": content_format,
                     "status": status,
-                    "scheduled_at": request.form.get(prefix + "scheduled_at", "").strip(),
+                    "scheduled_at": _datetime_from_form(prefix),
                 }
             )
             if not updates[-1]["title"] or not updates[-1]["content"]:
@@ -364,6 +364,7 @@ def edit_rss_article(rss_item_id):
         media_guides=PLATFORM_MEDIA_GUIDES,
         statuses=STATUSES,
         platforms=PLATFORMS,
+        datetime_parts=_datetime_parts,
     )
 
 
@@ -388,6 +389,7 @@ def new_post():
         statuses=STATUSES,
         platforms=PLATFORMS,
         action="Create",
+        datetime_parts=_datetime_parts,
     )
 
 
@@ -416,6 +418,7 @@ def edit_post(post_id):
         statuses=STATUSES,
         platforms=PLATFORMS,
         action="Update",
+        datetime_parts=_datetime_parts,
     )
 
 
@@ -596,7 +599,7 @@ def _post_from_form():
     platform = request.form["platform"]
     status = request.form["status"]
     content_format = request.form.get("content_format", "").strip() or default_content_format(platform)
-    scheduled_at = request.form.get("scheduled_at", "")
+    scheduled_at = _datetime_from_form()
 
     if platform not in PLATFORMS:
         abort(400)
@@ -634,28 +637,28 @@ def _flash_media_result(saved, skipped):
 
 def _schedule_dates_from_form():
     dates = []
-    primary = request.form.get("scheduled_at", "").strip()
+    primary = _datetime_from_form()
     if primary:
         dates.append(primary)
     extra_dates = request.form.get("schedule_dates", "")
-    dates.extend(line.strip() for line in extra_dates.splitlines())
+    dates.extend(_normalize_datetime_value(line.strip()) for line in extra_dates.splitlines() if line.strip())
     return dates
 
 
 def _schedule_dates_from_prefixed_form(prefix):
     dates = []
-    primary = request.form.get(prefix + "scheduled_at", "").strip()
+    primary = _datetime_from_form(prefix)
     if primary:
         dates.append(primary)
 
     extra_dates = request.form.get(prefix + "schedule_dates", "")
-    dates.extend(line.strip() for line in extra_dates.splitlines())
+    dates.extend(_normalize_datetime_value(line.strip()) for line in extra_dates.splitlines() if line.strip())
     dates.extend(_recurring_dates_from_form(prefix))
     return dates
 
 
 def _recurring_dates_from_form(prefix):
-    start = request.form.get(prefix + "repeat_start", "").strip()
+    start = _datetime_from_form(prefix, "repeat")
     count = request.form.get(prefix + "repeat_count", "").strip()
     interval_days = request.form.get(prefix + "repeat_interval_days", "").strip()
     if not start or not count or not interval_days:
@@ -672,6 +675,44 @@ def _recurring_dates_from_form(prefix):
         (start_date + timedelta(days=interval_value * index)).strftime("%Y-%m-%dT%H:%M")
         for index in range(count_value)
     ]
+
+
+def _datetime_from_form(prefix="", base_name="scheduled"):
+    legacy_value = request.form.get(prefix + base_name + "_at", "").strip()
+    date_value = request.form.get(prefix + base_name + "_date", "").strip()
+    time_value = request.form.get(prefix + base_name + "_time", "").strip()
+
+    if date_value:
+        return _normalize_datetime_value(f"{date_value}T{time_value or '18:00'}")
+    if legacy_value:
+        return _normalize_datetime_value(legacy_value)
+    return ""
+
+
+def _normalize_datetime_value(value):
+    value = value.strip()
+    if not value:
+        return ""
+    if len(value) == 10:
+        value = f"{value}T18:00"
+    if " " in value and "T" not in value:
+        value = value.replace(" ", "T", 1)
+    normalized = value[:16]
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        abort(400)
+    return parsed.strftime("%Y-%m-%dT%H:%M")
+
+
+def _datetime_parts(value):
+    normalized = _normalize_datetime_value(value or "")
+    if not normalized:
+        return {"date": "", "time": ""}
+    if "T" not in normalized:
+        return {"date": normalized[:10], "time": "18:00"}
+    date_value, time_value = normalized.split("T", 1)
+    return {"date": date_value, "time": (time_value or "18:00")[:5]}
 
 
 def _safe_next_url():

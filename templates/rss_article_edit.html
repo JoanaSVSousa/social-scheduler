@@ -46,6 +46,8 @@
     {% set prefix = "post_" ~ post.id ~ "_" %}
     {% set schedule_items = schedules_by_post.get(post.id, []) %}
     {% set media_items = media_by_post.get(post.id, []) %}
+    {% set scheduled_parts = datetime_parts(post.scheduled_at) %}
+    {% set repeat_parts = datetime_parts('') %}
     <article class="version-card">
         <div class="version-card-header">
             <div>
@@ -87,7 +89,11 @@
         <div class="form-row">
             <label>
                 Main scheduled date
-                <input type="datetime-local" name="{{ prefix }}scheduled_at" value="{{ post.scheduled_at }}">
+                <input type="date" name="{{ prefix }}scheduled_date" value="{{ scheduled_parts.date }}">
+            </label>
+            <label>
+                Main scheduled time
+                <input type="time" name="{{ prefix }}scheduled_time" value="{{ scheduled_parts.time }}">
             </label>
             <label>
                 Hashtags
@@ -103,8 +109,12 @@
 
         <div class="form-row">
             <label>
-                Repeat from
-                <input type="datetime-local" name="{{ prefix }}repeat_start">
+                Repeat from date
+                <input type="date" name="{{ prefix }}repeat_date" value="{{ repeat_parts.date }}">
+            </label>
+            <label>
+                Repeat from time
+                <input type="time" name="{{ prefix }}repeat_time" value="{{ repeat_parts.time }}">
             </label>
             <label>
                 Times
