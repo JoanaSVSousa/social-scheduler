@@ -82,6 +82,19 @@ CREATE TABLE IF NOT EXISTS post_schedules (
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS social_accounts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    platform TEXT NOT NULL UNIQUE,
+    account_label TEXT DEFAULT '',
+    account_handle TEXT DEFAULT '',
+    auth_type TEXT NOT NULL DEFAULT 'api_keys',
+    encrypted_credentials TEXT NOT NULL,
+    connection_status TEXT NOT NULL DEFAULT 'Needs verification',
+    last_verified_at TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 POSTGRES_SCHEMA = """
@@ -160,6 +173,19 @@ CREATE TABLE IF NOT EXISTS post_schedules (
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS social_accounts (
+    id SERIAL PRIMARY KEY,
+    platform TEXT NOT NULL UNIQUE,
+    account_label TEXT DEFAULT '',
+    account_handle TEXT DEFAULT '',
+    auth_type TEXT NOT NULL DEFAULT 'api_keys',
+    encrypted_credentials TEXT NOT NULL,
+    connection_status TEXT NOT NULL DEFAULT 'Needs verification',
+    last_verified_at TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 
@@ -220,6 +246,12 @@ def init_db(db_path=None):
         _ensure_column(conn, "rss_feeds", "last_error_count", "INTEGER NOT NULL DEFAULT 0")
         _ensure_column(conn, "rss_items", "content_type", "TEXT NOT NULL DEFAULT 'Regular'")
         _ensure_column(conn, "rss_items", "image_url", "TEXT DEFAULT ''")
+        _ensure_column(conn, "social_accounts", "account_label", "TEXT DEFAULT ''")
+        _ensure_column(conn, "social_accounts", "account_handle", "TEXT DEFAULT ''")
+        _ensure_column(conn, "social_accounts", "auth_type", "TEXT NOT NULL DEFAULT 'api_keys'")
+        _ensure_column(conn, "social_accounts", "encrypted_credentials", "TEXT NOT NULL DEFAULT ''")
+        _ensure_column(conn, "social_accounts", "connection_status", "TEXT NOT NULL DEFAULT 'Needs verification'")
+        _ensure_column(conn, "social_accounts", "last_verified_at", "TEXT")
 
 
 def _ensure_column(conn, table_name, column_name, column_definition):

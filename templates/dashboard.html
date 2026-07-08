@@ -25,16 +25,77 @@
     <div class="section-title">
         <div>
             <h2>Platforms</h2>
-            <p class="muted">Connect accounts here when API publishing is enabled.</p>
+            <p class="muted">Store publishing credentials here. Secrets are encrypted and never shown again after saving.</p>
         </div>
     </div>
-    <div class="platform-list platform-list-wide">
-        {% for platform, count in platform_counts.items() %}
-        <div>
-            <span>{{ platform }}</span>
-            <strong>{{ count }}</strong>
-            <button class="button" type="button" disabled>Connect account</button>
-        </div>
+    <div class="platform-list platform-list-wide social-account-grid">
+        {% for platform in platforms %}
+        {% set account = social_accounts.get(platform) %}
+        {% set summary = social_credential_summaries.get(platform, {}) %}
+        <article class="social-account-card">
+            <div class="social-account-header">
+                <div>
+                    <span>{{ platform }}</span>
+                    <strong>{{ platform_counts.get(platform, 0) }}</strong>
+                </div>
+                {% if account %}
+                <span class="status scheduled">{{ account.connection_status }}</span>
+                {% else %}
+                <span class="status draft">Not connected</span>
+                {% endif %}
+            </div>
+
+            <form method="post" action="{{ url_for('main.save_social_account_settings', platform=platform) }}" class="social-account-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="form-row compact-controls">
+                    <label>
+                        Label
+                        <input name="account_label" maxlength="120" value="{{ account.account_label if account else '' }}" placeholder="Squared Potato">
+                    </label>
+                    <label>
+                        Handle / page
+                        <input name="account_handle" maxlength="120" value="{{ account.account_handle if account else '' }}" placeholder="@squaredpotato">
+                    </label>
+                </div>
+                <label>
+                    Auth type
+                    <select name="auth_type">
+                        {% for value, label in [("api_keys", "API keys / tokens"), ("oauth", "OAuth access token"), ("app_password", "App password")] %}
+                        <option value="{{ value }}" {% if account and account.auth_type == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <div class="credential-grid">
+                    {% for field in credential_fields %}
+                    <label>
+                        {{ field.replace("_", " ")|title }}
+                        <input
+                            type="password"
+                            name="{{ field }}"
+                            autocomplete="off"
+                            placeholder="{% if summary.get(field) %}Saved - leave blank to keep{% else %}Paste {{ field.replace('_', ' ') }}{% endif %}"
+                        >
+                    </label>
+                    {% endfor %}
+                </div>
+                <div class="credential-summary">
+                    {% for field in credential_fields %}
+                    <span class="credential-pill {% if summary.get(field) %}saved{% endif %}">
+                        {{ field.replace("_", " ") }}: {% if summary.get(field) %}saved{% else %}empty{% endif %}
+                    </span>
+                    {% endfor %}
+                </div>
+                <div class="form-actions social-account-actions">
+                    <button class="button primary" type="submit">Save credentials</button>
+                </div>
+            </form>
+            {% if account %}
+            <form method="post" action="{{ url_for('main.delete_social_account_settings', platform=platform) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="button danger" type="submit">Remove credentials</button>
+            </form>
+            {% endif %}
+        </article>
         {% else %}
         <p>No platform data yet.</p>
         {% endfor %}

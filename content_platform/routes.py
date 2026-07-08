@@ -53,6 +53,13 @@ from .services.scheduler import (
     update_post_text,
     update_post,
 )
+from .services.social_accounts import (
+    SECRET_FIELDS,
+    credential_summary,
+    delete_social_account,
+    save_social_account,
+    social_accounts_by_platform,
+)
 from .services.squared_feeds import SQUARED_FEEDS
 
 
@@ -68,6 +75,7 @@ def dashboard():
     schedules_by_post = get_schedules_for_posts(post_ids)
     post_rows = _aggregate_posts_for_library(posts, media_by_post, schedules_by_post)
     calendar_context = _build_dashboard_calendar(posts, schedules_by_post)
+    social_accounts = social_accounts_by_platform()
     return render_template(
         "dashboard.html",
         posts=post_rows[:8],
@@ -76,6 +84,12 @@ def dashboard():
         calendar_context=calendar_context,
         status_counts=build_status_counts(posts),
         platform_counts=build_platform_counts(posts),
+        social_accounts=social_accounts,
+        social_credential_summaries={
+            platform: credential_summary(account) for platform, account in social_accounts.items()
+        },
+        credential_fields=SECRET_FIELDS,
+        platforms=PLATFORMS,
     )
 
 
@@ -565,6 +579,42 @@ def remove_rss_article(rss_item_id):
 def process_queue():
     validate_csrf()
     process_publication_queue()
+    return redirect(url_for("main.dashboard"))
+
+
+@bp.post("/settings/social-accounts/<platform>")
+@login_required
+def save_social_account_settings(platform):
+    validate_csrf()
+    if platform not in PLATFORMS:
+        abort(404)
+
+    credentials = {field: request.form.get(field, "") for field in SECRET_FIELDS}
+    try:
+        save_social_account(
+            platform,
+            request.form.get("account_label", "").strip()[:120],
+            request.form.get("account_handle", "").strip()[:120],
+            request.form.get("auth_type", "api_keys").strip()[:60] or "api_keys",
+            credentials,
+        )
+    except RuntimeError as exc:
+        flash(str(exc), "warning")
+    else:
+        add_log(None, "INFO", f"Social credentials updated for {platform}.")
+        flash(f"{platform} credentials saved securely.", "success")
+    return redirect(url_for("main.dashboard"))
+
+
+@bp.post("/settings/social-accounts/<platform>/delete")
+@login_required
+def delete_social_account_settings(platform):
+    validate_csrf()
+    if platform not in PLATFORMS:
+        abort(404)
+    delete_social_account(platform)
+    add_log(None, "INFO", f"Social credentials removed for {platform}.")
+    flash(f"{platform} credentials removed.", "success")
     return redirect(url_for("main.dashboard"))
 
 

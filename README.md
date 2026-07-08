@@ -75,7 +75,10 @@ For real use, set these environment variables:
 export ADMIN_PASSWORD="your-strong-password"
 export ADMIN_USERNAME="SquaredRedes"
 export SECRET_KEY="your-strong-secret-key"
+export CREDENTIALS_ENCRYPTION_KEY="generate-with-python-scripts-generate-encryption-key-py"
 ```
+
+`CREDENTIALS_ENCRYPTION_KEY` protects saved social API credentials. Keep it stable in Render; changing it means existing saved credentials cannot be decrypted.
 
 Then open:
 

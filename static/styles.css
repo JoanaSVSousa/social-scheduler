@@ -207,7 +207,8 @@ button.danger {
 }
 
 .metric,
-.platform-list div,
+.platform-list > div,
+.social-account-card,
 .table-wrap,
 .form {
     background: var(--surface);
@@ -216,13 +217,15 @@ button.danger {
 }
 
 .metric,
-.platform-list div {
+.platform-list > div,
+.social-account-card {
     border-radius: 8px;
     padding: 18px;
 }
 
 .metric span,
-.platform-list span,
+.platform-list > div > span,
+.social-account-header span,
 .muted {
     color: var(--muted);
     display: block;
@@ -441,20 +444,86 @@ tr:last-child td {
     grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
 }
 
-.platform-list div {
+.platform-list > div {
     align-items: center;
     display: flex;
     gap: 12px;
     justify-content: space-between;
 }
 
-.platform-list-wide div {
+.platform-list-wide > div {
     align-items: start;
     flex-direction: column;
 }
 
 .platform-list-wide .button {
     width: 100%;
+}
+
+.social-account-grid {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.social-account-card {
+    display: grid;
+    gap: 14px;
+}
+
+.social-account-card:hover {
+    background: var(--surface-hover);
+    border-color: rgba(255, 79, 216, 0.28);
+}
+
+.social-account-header {
+    align-items: start;
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+}
+
+.social-account-header strong {
+    color: white;
+    display: block;
+    font-size: 1.55rem;
+    line-height: 1;
+    margin-top: 4px;
+}
+
+.social-account-form {
+    display: grid;
+    gap: 12px;
+}
+
+.credential-grid {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.credential-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.credential-pill {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-weight: 800;
+    padding: 4px 8px;
+}
+
+.credential-pill.saved {
+    background: rgba(93, 240, 167, 0.12);
+    border-color: rgba(93, 240, 167, 0.3);
+    color: var(--green);
+}
+
+.social-account-actions {
+    margin-top: 0;
 }
 
 .table-link {
@@ -665,7 +734,7 @@ label {
 }
 
 .feed-card:hover,
-.platform-list div:hover,
+.platform-list > div:hover,
 .metric:hover {
     background: var(--surface-hover);
     border-color: rgba(255, 79, 216, 0.28);
