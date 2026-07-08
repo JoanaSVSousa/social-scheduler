@@ -127,12 +127,20 @@
                 <td class="actions">
                     {% if post.is_rss_group %}
                     <a class="button" href="{{ url_for('main.edit_rss_article', rss_item_id=post.rss_item_id) }}">Edit versions</a>
+                    <form method="post" action="{{ url_for('main.publish_rss_article_now', rss_item_id=post.rss_item_id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="button primary" type="submit">Publish now</button>
+                    </form>
                     <form method="post" action="{{ url_for('main.remove_rss_article', rss_item_id=post.rss_item_id) }}">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button class="button danger" type="submit">Delete</button>
                     </form>
                     {% else %}
                     <a class="button" href="{{ url_for('main.edit_post', post_id=post.id) }}">Edit</a>
+                    <form method="post" action="{{ url_for('main.publish_single_post_now', post_id=post.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="button primary" type="submit">Publish now</button>
+                    </form>
                     <form method="post" action="{{ url_for('main.remove_post', post_id=post.id) }}">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button class="button danger" type="submit">Delete</button>

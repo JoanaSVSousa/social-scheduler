@@ -18,7 +18,7 @@ from .security import validate_csrf
 from .auth import is_logged_in, login_required, verify_admin_credentials
 from .services.analytics import build_platform_counts, build_status_counts
 from .services.media import delete_media, get_media_for_post, get_media_for_posts, save_media_files
-from .services.publisher import process_publication_queue
+from .services.publisher import process_publication_queue, publish_post_now, publish_rss_group_now
 from .services.rss import (
     check_all_feeds,
     create_feed,
@@ -568,11 +568,38 @@ def remove_post(post_id):
     return redirect(url_for("main.posts"))
 
 
+@bp.post("/posts/<int:post_id>/publish-now")
+def publish_single_post_now(post_id):
+    validate_csrf()
+    result = publish_post_now(post_id)
+    if result["ok"]:
+        flash("Post published successfully.", "success")
+    else:
+        flash(f"Publication failed: {result['message']}", "warning")
+    return redirect(url_for("main.posts"))
+
+
 @bp.post("/rss/articles/<int:rss_item_id>/delete")
 def remove_rss_article(rss_item_id):
     validate_csrf()
     delete_rss_group(rss_item_id)
     flash("RSS article and its network versions deleted.", "success")
+    return redirect(url_for("main.posts"))
+
+
+@bp.post("/rss/articles/<int:rss_item_id>/publish-now")
+def publish_rss_article_now(rss_item_id):
+    validate_csrf()
+    item, posts = get_rss_group(rss_item_id)
+    if item is None:
+        abort(404)
+    result = publish_rss_group_now(posts)
+    if result["published"] and not result["failed"]:
+        flash(f"Published {result['published']} version(s).", "success")
+    elif result["published"]:
+        flash(f"Published {result['published']} version(s); {result['failed']} failed. Check logs.", "warning")
+    else:
+        flash("Publication failed for every version. Check logs.", "warning")
     return redirect(url_for("main.posts"))
 
 
