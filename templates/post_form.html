@@ -114,7 +114,7 @@
     <div class="form-actions">
         <button class="button primary" type="submit">{{ action }} Post</button>
         {% if post %}
-        <button class="button primary" type="submit" form="publish-post-now-form">Publish now</button>
+        <button class="button primary" type="submit" name="publish_after_save" value="1">Save and publish now</button>
         {% endif %}
         <a class="button" href="{{ url_for('main.posts') }}">Cancel</a>
     </div>
@@ -150,23 +150,18 @@
                 {% endif %}
             </div>
 
-            <h3 id="preview-title">{{ post.title if post else 'Untitled post' }}</h3>
             <p id="preview-content">{{ post.content if post else 'Write the post content to preview it here.' }}</p>
             <p class="preview-hashtags" id="preview-hashtags">{{ post.hashtags if post else '' }}</p>
         </article>
     </aside>
 </form>
-{% if post %}
-<form method="post" action="{{ url_for('main.publish_single_post_now', post_id=post.id) }}" id="publish-post-now-form" hidden>
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-</form>
-{% endif %}
 
 <script>
 const mediaGuides = {{ media_guides|tojson }};
 const contentFormats = {{ content_formats|tojson }};
 const formatGuides = {{ format_guides|tojson }};
 const formatRules = {{ format_rules|tojson }};
+const contentLimits = {{ content_limits|tojson }};
 const platformSelect = document.querySelector("#platform-select");
 const formatSelect = document.querySelector("#format-select");
 const statusSelect = document.querySelector("#status-select");
@@ -181,7 +176,6 @@ const formatGuide = document.querySelector("#format-guide");
 const previewPlatform = document.querySelector("#preview-platform");
 const previewFormat = document.querySelector("#preview-format");
 const previewStatus = document.querySelector("#preview-status");
-const previewTitle = document.querySelector("#preview-title");
 const previewContent = document.querySelector("#preview-content");
 const previewHashtags = document.querySelector("#preview-hashtags");
 const previewMedia = document.querySelector("#preview-media");
@@ -229,14 +223,28 @@ function syncGuides() {
 
 function syncPreview() {
     const format = formatSelect.value || "";
+    enforceContentBudget();
     previewPlatform.textContent = platformSelect.value;
     previewFormat.textContent = format;
     previewStatus.textContent = statusSelect.value;
     previewStatus.className = `status ${statusSelect.value.toLowerCase()}`;
-    previewTitle.textContent = titleInput.value.trim() || "Untitled post";
     previewContent.textContent = contentInput.value.trim() || "Write the post content to preview it here.";
     previewHashtags.textContent = hashtagsInput.value.trim();
     previewCard.className = `social-preview ${previewClassForFormat(format)} ${previewCopyClassForFormat(format)}`;
+}
+
+function contentBudget() {
+    const baseLimit = contentLimits[platformSelect.value] || 2200;
+    const tagText = (hashtagsInput.value || "").trim();
+    return Math.max(baseLimit - (tagText ? tagText.length + 2 : 0), 1);
+}
+
+function enforceContentBudget() {
+    const budget = contentBudget();
+    contentInput.maxLength = budget;
+    if (contentInput.value.length > budget) {
+        contentInput.value = contentInput.value.slice(0, budget).trimEnd();
+    }
 }
 
 function previewClassForFormat(format) {
@@ -280,7 +288,10 @@ function syncSelectedMediaPreview() {
     });
 }
 
-platformSelect.addEventListener("change", syncFormats);
+platformSelect.addEventListener("change", () => {
+    syncFormats();
+    enforceContentBudget();
+});
 formatSelect.addEventListener("change", syncGuides);
 formatSelect.addEventListener("change", syncPreview);
 statusSelect.addEventListener("change", () => {
@@ -289,10 +300,17 @@ statusSelect.addEventListener("change", () => {
     syncPreview();
 });
 titleInput.addEventListener("input", syncPreview);
-contentInput.addEventListener("input", syncPreview);
-hashtagsInput.addEventListener("input", syncPreview);
+contentInput.addEventListener("input", () => {
+    enforceContentBudget();
+    syncPreview();
+});
+hashtagsInput.addEventListener("input", () => {
+    enforceContentBudget();
+    syncPreview();
+});
 mediaInput.addEventListener("change", syncSelectedMediaPreview);
 syncFormats();
+enforceContentBudget();
 scheduledDate.required = statusSelect.value === "Scheduled";
 scheduledTime.required = statusSelect.value === "Scheduled";
 syncPreview();

@@ -8,6 +8,7 @@ from urllib.request import Request, urlopen
 
 from .media import UPLOAD_DIR
 from .social_accounts import decrypt_credentials_for_publisher
+from ..models import truncate_content_for_platform
 
 
 class PublicationError(Exception):
@@ -66,12 +67,14 @@ def publish_to_bluesky(post, media_items):
 
 
 def _compose_bluesky_text(post):
-    pieces = [post["content"].strip(), post["hashtags"].strip()]
+    hashtags = post["hashtags"].strip()
+    content = truncate_content_for_platform("Bluesky", post["content"], hashtags)
+    pieces = [content, hashtags]
     text = "\n\n".join(piece for piece in pieces if piece)
     if not text:
-        text = post["title"].strip()
+        raise PublicationError("Post content is empty. The title is internal and is not published.")
     if len(text) > 300:
-        raise PublicationError("Bluesky posts must be 300 characters or less. Shorten this version before publishing.")
+        raise PublicationError("Bluesky hashtags are too long to fit in a 300-character post.")
     return text
 
 

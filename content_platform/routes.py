@@ -10,9 +10,12 @@ from .models import (
     PLATFORM_CONTENT_FORMATS,
     PLATFORM_MEDIA_GUIDES,
     PLATFORMS,
+    PLATFORM_CONTENT_LIMITS,
     STATUSES,
     Post,
+    content_limit_for_post,
     default_content_format,
+    truncate_content_for_platform,
 )
 from .security import validate_csrf
 from .auth import is_logged_in, login_required, verify_admin_credentials
@@ -343,8 +346,8 @@ def quick_edit_calendar_post(post_id):
         abort(404)
 
     title = request.form.get("title", "").strip()[:120]
-    content = request.form.get("content", "").strip()[:2200]
     hashtags = request.form.get("hashtags", "").strip()[:400]
+    content = truncate_content_for_platform(post["platform"], request.form.get("content", ""), hashtags)
     if not title or not content:
         abort(400)
 
@@ -448,12 +451,16 @@ def edit_rss_article(rss_item_id):
                 abort(400)
             if content_format not in PLATFORM_CONTENT_FORMATS.get(post["platform"], []):
                 abort(400)
+            title = _override_or_general(prefix, "title", post["title"], general_values["title"], 120)
+            hashtags = _override_or_general(prefix, "hashtags", post["hashtags"], general_values["hashtags"], 400)
+            content = _override_or_general(prefix, "content", post["content"], general_values["content"])
+            content = truncate_content_for_platform(post["platform"], content, hashtags)
             updates.append(
                 {
                     "post_id": post["id"],
-                    "title": _override_or_general(prefix, "title", post["title"], general_values["title"], 120),
-                    "content": _override_or_general(prefix, "content", post["content"], general_values["content"], 2200),
-                    "hashtags": _override_or_general(prefix, "hashtags", post["hashtags"], general_values["hashtags"], 400),
+                    "title": title,
+                    "content": content,
+                    "hashtags": hashtags,
                     "content_format": content_format,
                     "status": status,
                     "scheduled_at": _datetime_from_form(prefix) if _uses_field_override(prefix, "schedule") else general_values["scheduled_at"],
@@ -482,7 +489,17 @@ def edit_rss_article(rss_item_id):
                 content_format,
             )
             _flash_media_result(saved, skipped)
-        flash("Article versions updated.", "success")
+        if request.form.get("publish_after_save") == "1":
+            _, updated_posts = get_rss_group(rss_item_id)
+            result = publish_rss_group_now(updated_posts)
+            if result["published"] and not result["failed"]:
+                flash(f"Article versions saved and {result['published']} version(s) published.", "success")
+            elif result["published"]:
+                flash(f"Article versions saved. Published {result['published']} version(s); {result['failed']} failed. Check logs.", "warning")
+            else:
+                flash("Article versions saved, but publication failed for every version. Check logs.", "warning")
+        else:
+            flash("Article versions updated.", "success")
         return redirect(url_for("main.edit_rss_article", rss_item_id=rss_item_id))
 
     schedules_by_post = get_schedules_for_posts([post["id"] for post in posts])
@@ -502,6 +519,8 @@ def edit_rss_article(rss_item_id):
         platforms=PLATFORMS,
         datetime_parts=_datetime_parts,
         format_rules=FORMAT_MEDIA_RULES,
+        content_limits=PLATFORM_CONTENT_LIMITS,
+        content_limit_for_post=content_limit_for_post,
     )
 
 
@@ -523,6 +542,7 @@ def new_post():
         content_formats=PLATFORM_CONTENT_FORMATS,
         format_guides=FORMAT_MEDIA_GUIDES,
         format_rules=FORMAT_MEDIA_RULES,
+        content_limits=PLATFORM_CONTENT_LIMITS,
         media_guides=PLATFORM_MEDIA_GUIDES,
         statuses=STATUSES,
         platforms=PLATFORMS,
@@ -543,6 +563,12 @@ def edit_post(post_id):
         replace_schedules(post_id, _schedule_dates_from_form())
         saved, skipped = save_media_files(post_id, request.files.getlist("media_files"), request.form.get("content_format", ""))
         _flash_media_result(saved, skipped)
+        if request.form.get("publish_after_save") == "1":
+            result = publish_post_now(post_id)
+            if result["ok"]:
+                flash("Post saved and published successfully.", "success")
+            else:
+                flash(f"Post saved, but publication failed: {result['message']}", "warning")
         return redirect(url_for("main.posts"))
 
     return render_template(
@@ -553,6 +579,7 @@ def edit_post(post_id):
         content_formats=PLATFORM_CONTENT_FORMATS,
         format_guides=FORMAT_MEDIA_GUIDES,
         format_rules=FORMAT_MEDIA_RULES,
+        content_limits=PLATFORM_CONTENT_LIMITS,
         media_guides=PLATFORM_MEDIA_GUIDES,
         statuses=STATUSES,
         platforms=PLATFORMS,
@@ -811,7 +838,8 @@ def _post_from_form():
         abort(400)
     if not title or len(title) > 120:
         abort(400)
-    if not content or len(content) > 2200:
+    content = truncate_content_for_platform(platform, content, hashtags)
+    if not content:
         abort(400)
     if len(hashtags) > 400:
         abort(400)

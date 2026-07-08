@@ -5,6 +5,17 @@ from typing import Optional
 PLATFORMS = ["Instagram", "Facebook", "LinkedIn", "X", "Threads", "Bluesky", "YouTube Shorts", "TikTok"]
 STATUSES = ["Draft", "Scheduled", "Published", "Failed"]
 
+PLATFORM_CONTENT_LIMITS = {
+    "Instagram": 2200,
+    "Facebook": 63206,
+    "LinkedIn": 3000,
+    "X": 280,
+    "Threads": 500,
+    "Bluesky": 300,
+    "YouTube Shorts": 100,
+    "TikTok": 2200,
+}
+
 PLATFORM_MEDIA_GUIDES = {
     "Instagram": "Feed images, carousels, reels, videos, and stories. Use 9:16 video for Reels/Stories.",
     "Facebook": "Images, link previews, reels, and video. Landscape or square formats work well.",
@@ -104,6 +115,26 @@ FORMAT_MEDIA_RULES = {
 
 def default_content_format(platform):
     return PLATFORM_CONTENT_FORMATS.get(platform, ["Post"])[0]
+
+
+def content_character_limit(platform):
+    return PLATFORM_CONTENT_LIMITS.get(platform, 2200)
+
+
+def content_limit_for_post(platform, hashtags=""):
+    limit = content_character_limit(platform)
+    hashtags = (hashtags or "").strip()
+    if hashtags:
+        limit -= len(hashtags) + 2
+    return max(limit, 1)
+
+
+def truncate_content_for_platform(platform, content, hashtags=""):
+    content = (content or "").strip()
+    limit = content_limit_for_post(platform, hashtags)
+    if len(content) <= limit:
+        return content
+    return content[:limit].rstrip()
 
 
 @dataclass

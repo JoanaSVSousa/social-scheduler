@@ -192,7 +192,6 @@
                     <div class="preview-media-empty">No media attached yet</div>
                     {% endif %}
                 </div>
-                <h3 data-general-preview-title-output>{{ general_defaults.title }}</h3>
                 <p data-general-preview-content-output>{{ general_defaults.content }}</p>
                 <p data-general-preview-hashtags-output class="preview-hashtags">{{ general_defaults.hashtags }}</p>
             </article>
@@ -237,7 +236,14 @@
                 <span class="inheritance-state" data-inheritance-state="content">{% if overrides.content %}Custom {{ post.platform }}{% else %}General{% endif %}</span>
             </span>
             <input type="hidden" name="{{ prefix }}override_content" value="{% if overrides.content %}1{% else %}0{% endif %}" data-override-flag="content">
-            <textarea data-preview-content data-network-field="content" name="{{ prefix }}content" rows="8" maxlength="2200" required>{{ post.content }}</textarea>
+            <textarea
+                data-preview-content
+                data-network-field="content"
+                name="{{ prefix }}content"
+                rows="8"
+                maxlength="{{ content_limit_for_post(post.platform, post.hashtags) }}"
+                required
+            >{{ post.content }}</textarea>
             <span class="field-help">Only this field becomes custom when you edit it in this network tab.</span>
         </label>
 
@@ -374,7 +380,6 @@
                         <div class="preview-media-empty">No media attached yet</div>
                     {% endif %}
                 </div>
-                <h3 data-preview-title-output>{{ post.title }}</h3>
                 <p data-preview-content-output>{{ post.content }}</p>
                 <p data-preview-hashtags-output class="preview-hashtags">{{ post.hashtags }}</p>
             </article>
@@ -385,15 +390,13 @@
 
     <div class="form-actions sticky-actions">
         <button class="button primary" type="submit">Save all versions</button>
-        <button class="button primary" type="submit" form="publish-rss-now-form">Publish now</button>
+        <button class="button primary" type="submit" name="publish_after_save" value="1">Save and publish now</button>
         <a class="button" href="{{ url_for('main.posts') }}">Back to posts</a>
     </div>
 </form>
-<form method="post" action="{{ url_for('main.publish_rss_article_now', rss_item_id=item.id) }}" id="publish-rss-now-form" hidden>
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-</form>
 <script>
 const formatRules = {{ format_rules|tojson }};
+const contentLimits = {{ content_limits|tojson }};
 
 function previewClassForFormat(format) {
     const normalized = format.toLowerCase();
@@ -414,6 +417,25 @@ function previewClassForFormat(format) {
 
 function previewCopyClassForFormat(format) {
     return format.toLowerCase().includes("story") ? "preview-no-copy" : "";
+}
+
+function contentBudget(platform, hashtags) {
+    const baseLimit = contentLimits[platform] || 2200;
+    const tagText = (hashtags || "").trim();
+    return Math.max(baseLimit - (tagText ? tagText.length + 2 : 0), 1);
+}
+
+function truncateToBudget(value, budget) {
+    const cleanValue = (value || "").trim();
+    return cleanValue.length > budget ? cleanValue.slice(0, budget).trimEnd() : cleanValue;
+}
+
+function enforceContentBudget(field, platform, hashtags) {
+    const budget = contentBudget(platform, hashtags);
+    field.maxLength = budget;
+    if (field.value.length > budget) {
+        field.value = truncateToBudget(field.value, budget);
+    }
 }
 
 document.querySelectorAll("[data-target-version]").forEach((button) => {
@@ -481,21 +503,51 @@ function applyGeneralValue(fieldName, value) {
         if (!card || hasOverride(card, overrideGroupForField(fieldName))) {
             return;
         }
+        let nextValue = value;
+        if (fieldName === "content") {
+            const hashtags = card.querySelector('[data-network-field="hashtags"]')?.value || generalFields.hashtags?.value || "";
+            nextValue = truncateToBudget(value, contentBudget(card.dataset.platform, hashtags));
+        }
         field.dataset.syncingGeneral = "1";
-        field.value = value;
+        field.value = nextValue;
         field.dispatchEvent(new Event("input", { bubbles: true }));
         field.dispatchEvent(new Event("change", { bubbles: true }));
         delete field.dataset.syncingGeneral;
     });
 }
 
+function refreshContentBudgetsFromGeneral() {
+    document.querySelectorAll("[data-version-card]").forEach((card) => {
+        const contentField = card.querySelector('[data-network-field="content"]');
+        const hashtagsField = card.querySelector('[data-network-field="hashtags"]');
+        if (!contentField || !hashtagsField) {
+            return;
+        }
+        if (hasOverride(card, "content")) {
+            enforceContentBudget(contentField, card.dataset.platform, hashtagsField.value);
+            return;
+        }
+        contentField.dataset.syncingGeneral = "1";
+        contentField.value = truncateToBudget(generalFields.content?.value || "", contentBudget(card.dataset.platform, hashtagsField.value));
+        contentField.dispatchEvent(new Event("input", { bubbles: true }));
+        contentField.dispatchEvent(new Event("change", { bubbles: true }));
+        delete contentField.dataset.syncingGeneral;
+    });
+}
+
 document.querySelectorAll("[data-general-field]").forEach((field) => {
     field.addEventListener("input", () => {
         applyGeneralValue(field.dataset.generalField, field.value);
+        if (["content", "hashtags"].includes(field.dataset.generalField)) {
+            refreshContentBudgetsFromGeneral();
+        }
         syncGeneralPreview();
     });
     field.addEventListener("change", () => {
         applyGeneralValue(field.dataset.generalField, field.value);
+        if (["content", "hashtags"].includes(field.dataset.generalField)) {
+            refreshContentBudgetsFromGeneral();
+        }
         syncGeneralPreview();
     });
 });
@@ -549,9 +601,10 @@ function syncGeneralPreview() {
     const previewCard = document.querySelector("[data-general-preview-card]");
     document.querySelector("[data-general-preview-platform-output]").textContent = platform || "General";
     document.querySelector("[data-general-preview-format-output]").textContent = format;
-    document.querySelector("[data-general-preview-title-output]").textContent = generalFields.title?.value.trim() || "Untitled post";
-    document.querySelector("[data-general-preview-content-output]").textContent = generalFields.content?.value.trim() || "Write the post content to preview it here.";
-    document.querySelector("[data-general-preview-hashtags-output]").textContent = generalFields.hashtags?.value.trim() || "";
+    const generalHashtags = generalFields.hashtags?.value.trim() || "";
+    const previewContent = truncateToBudget(generalFields.content?.value || "", contentBudget(platform, generalHashtags));
+    document.querySelector("[data-general-preview-content-output]").textContent = previewContent || "Write the post content to preview it here.";
+    document.querySelector("[data-general-preview-hashtags-output]").textContent = generalHashtags;
     const statusOutput = document.querySelector("[data-general-preview-status-output]");
     statusOutput.textContent = status;
     statusOutput.className = `status ${status.toLowerCase()}`;
@@ -590,7 +643,6 @@ document.querySelectorAll("[data-version-card]").forEach((card) => {
     const statusInput = card.querySelector("[data-preview-status]");
     const hashtagsInput = card.querySelector("[data-preview-hashtags]");
     const mediaInput = card.querySelector("[data-preview-media-input]");
-    const titleOutput = card.querySelector("[data-preview-title-output]");
     const contentOutput = card.querySelector("[data-preview-content-output]");
     const formatOutput = card.querySelector("[data-preview-format-output]");
     const statusOutput = card.querySelector("[data-preview-status-output]");
@@ -601,7 +653,7 @@ document.querySelectorAll("[data-version-card]").forEach((card) => {
 
     function syncPreview() {
         const format = formatInput.value;
-        titleOutput.textContent = titleInput.value.trim() || "Untitled post";
+        enforceContentBudget(contentInput, card.dataset.platform, hashtagsInput.value);
         contentOutput.textContent = contentInput.value.trim() || "Write the post content to preview it here.";
         formatOutput.textContent = format;
         statusOutput.textContent = statusInput.value;
@@ -667,11 +719,20 @@ document.querySelectorAll("[data-version-card]").forEach((card) => {
 
     [titleInput, contentInput, formatInput, statusInput, hashtagsInput].forEach((input) => {
         input.addEventListener("input", () => {
+            if (input === hashtagsInput) {
+                enforceContentBudget(contentInput, card.dataset.platform, hashtagsInput.value);
+            }
+            if (input === contentInput) {
+                enforceContentBudget(contentInput, card.dataset.platform, hashtagsInput.value);
+            }
             if (!input.dataset.syncingGeneral) {
                 setOverride(card, overrideGroupForField(input.dataset.networkField), true);
             }
         });
         input.addEventListener("change", () => {
+            if (input === hashtagsInput || input === contentInput) {
+                enforceContentBudget(contentInput, card.dataset.platform, hashtagsInput.value);
+            }
             if (!input.dataset.syncingGeneral) {
                 setOverride(card, overrideGroupForField(input.dataset.networkField), true);
             }
@@ -705,6 +766,7 @@ document.querySelectorAll("[data-version-card]").forEach((card) => {
     mediaInput.addEventListener("change", syncSelectedMediaPreview);
     syncPreview();
 });
+refreshContentBudgetsFromGeneral();
 syncGeneralPreview();
 </script>
 {% endblock %}
