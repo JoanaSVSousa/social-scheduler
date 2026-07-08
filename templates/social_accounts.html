@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="section-title">
+    <div>
+        <p class="eyebrow">Publishing Integrations</p>
+        <h1>API Accounts</h1>
+        <p class="muted">Store publishing credentials here. Secrets are encrypted and never shown again after saving.</p>
+    </div>
+    <a class="button" href="{{ url_for('main.dashboard') }}">Back to dashboard</a>
+</div>
+
+<section class="dashboard-platforms">
+    <div class="platform-list platform-list-wide social-account-grid">
+        {% for platform in platforms %}
+        {% set account = social_accounts.get(platform) %}
+        {% set summary = social_credential_summaries.get(platform, {}) %}
+        {% set schema = social_account_schemas.get(platform) %}
+        <article class="social-account-card">
+            <div class="social-account-header">
+                <div>
+                    <span>{{ platform }}</span>
+                    <strong>{{ platform_counts.get(platform, 0) }}</strong>
+                </div>
+                {% if account %}
+                <span class="status scheduled">{{ account.connection_status }}</span>
+                {% else %}
+                <span class="status draft">Not connected</span>
+                {% endif %}
+            </div>
+
+            <form method="post" action="{{ url_for('main.save_social_account_settings', platform=platform) }}" class="social-account-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="form-row compact-controls">
+                    <label>
+                        Label
+                        <input name="account_label" maxlength="120" value="{{ account.account_label if account else '' }}" placeholder="Squared Potato">
+                    </label>
+                    <label>
+                        Handle / page
+                        <input name="account_handle" maxlength="120" value="{{ account.account_handle if account else '' }}" placeholder="@squaredpotato">
+                    </label>
+                </div>
+                <label>
+                    Auth type
+                    <select name="auth_type">
+                        {% for value, label in schema.auth_options %}
+                        <option value="{{ value }}" {% if account and account.auth_type == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <p class="field-help">{{ schema.description }}</p>
+                <div class="credential-grid">
+                    {% for field in schema.fields %}
+                    <label>
+                        {{ field.label }}
+                        <input
+                            type="password"
+                            name="{{ field.name }}"
+                            autocomplete="off"
+                            placeholder="{% if summary.get(field.name) %}Saved - leave blank to keep{% else %}{{ field.placeholder }}{% endif %}"
+                        >
+                    </label>
+                    {% endfor %}
+                </div>
+                <div class="credential-summary">
+                    {% for field in schema.fields %}
+                    <span class="credential-pill {% if summary.get(field.name) %}saved{% endif %}">
+                        {{ field.label }}: {% if summary.get(field.name) %}saved{% else %}empty{% endif %}
+                    </span>
+                    {% endfor %}
+                </div>
+                <div class="form-actions social-account-actions">
+                    <button class="button primary" type="submit">Save credentials</button>
+                </div>
+            </form>
+            {% if account %}
+            <form method="post" action="{{ url_for('main.delete_social_account_settings', platform=platform) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="button danger" type="submit">Remove credentials</button>
+            </form>
+            {% endif %}
+        </article>
+        {% else %}
+        <p>No platform data yet.</p>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

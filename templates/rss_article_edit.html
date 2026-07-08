@@ -385,8 +385,12 @@
 
     <div class="form-actions sticky-actions">
         <button class="button primary" type="submit">Save all versions</button>
+        <button class="button primary" type="submit" form="publish-rss-now-form">Publish now</button>
         <a class="button" href="{{ url_for('main.posts') }}">Back to posts</a>
     </div>
+</form>
+<form method="post" action="{{ url_for('main.publish_rss_article_now', rss_item_id=item.id) }}" id="publish-rss-now-form" hidden>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 </form>
 <script>
 const formatRules = {{ format_rules|tojson }};

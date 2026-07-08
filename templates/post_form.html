@@ -113,6 +113,9 @@
 
     <div class="form-actions">
         <button class="button primary" type="submit">{{ action }} Post</button>
+        {% if post %}
+        <button class="button primary" type="submit" form="publish-post-now-form">Publish now</button>
+        {% endif %}
         <a class="button" href="{{ url_for('main.posts') }}">Cancel</a>
     </div>
     </div>
@@ -153,6 +156,11 @@
         </article>
     </aside>
 </form>
+{% if post %}
+<form method="post" action="{{ url_for('main.publish_single_post_now', post_id=post.id) }}" id="publish-post-now-form" hidden>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</form>
+{% endif %}
 
 <script>
 const mediaGuides = {{ media_guides|tojson }};

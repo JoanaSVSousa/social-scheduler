@@ -76,7 +76,6 @@ def dashboard():
     schedules_by_post = get_schedules_for_posts(post_ids)
     post_rows = _aggregate_posts_for_library(posts, media_by_post, schedules_by_post)
     calendar_context = _build_dashboard_calendar(posts, schedules_by_post)
-    social_accounts = social_accounts_by_platform()
     return render_template(
         "dashboard.html",
         posts=post_rows[:8],
@@ -84,6 +83,17 @@ def dashboard():
         schedules_by_post=schedules_by_post,
         calendar_context=calendar_context,
         status_counts=build_status_counts(posts),
+        platform_counts=build_platform_counts(posts),
+    )
+
+
+@bp.route("/settings/social-accounts")
+@login_required
+def social_account_settings():
+    posts = get_all_posts()
+    social_accounts = social_accounts_by_platform()
+    return render_template(
+        "social_accounts.html",
         platform_counts=build_platform_counts(posts),
         social_accounts=social_accounts,
         social_credential_summaries={
@@ -631,7 +641,7 @@ def save_social_account_settings(platform):
     else:
         add_log(None, "INFO", f"Social credentials updated for {platform}.")
         flash(f"{platform} credentials saved securely.", "success")
-    return redirect(url_for("main.dashboard"))
+    return redirect(url_for("main.social_account_settings"))
 
 
 @bp.post("/settings/social-accounts/<platform>/delete")
@@ -643,7 +653,7 @@ def delete_social_account_settings(platform):
     delete_social_account(platform)
     add_log(None, "INFO", f"Social credentials removed for {platform}.")
     flash(f"{platform} credentials removed.", "success")
-    return redirect(url_for("main.dashboard"))
+    return redirect(url_for("main.social_account_settings"))
 
 
 @bp.route("/logs")
