@@ -35,8 +35,7 @@ from .services.rss_groups import (
     delete_rss_group,
     get_rss_group,
     list_rss_groups,
-    move_rss_group_main_schedule,
-    move_rss_group_recycled_schedule,
+    move_rss_group_schedule_occurrence,
     sync_rss_group_platforms,
     update_rss_group_content_type,
     update_rss_group_posts,
@@ -341,6 +340,18 @@ def _edit_url_for_post(post):
     return url_for("main.edit_post", post_id=post["id"])
 
 
+def _publish_group_summary(prefix, result):
+    parts = []
+    if result.get("published"):
+        parts.append(f"Published {result['published']} version(s)")
+    if result.get("skipped"):
+        parts.append(f"skipped {result['skipped']} unsupported platform(s)")
+    if result.get("failed"):
+        parts.append(f"{result['failed']} failed")
+    message = "; ".join(parts) + ". Check logs."
+    return f"{prefix} {message}".strip()
+
+
 @bp.post("/calendar/posts/<int:post_id>/quick-edit")
 def quick_edit_calendar_post(post_id):
     validate_csrf()
@@ -387,8 +398,8 @@ def reschedule_calendar_event():
             abort(404)
         post = get_post(schedule["post_id"])
         if post and post["rss_item_id"]:
-            move_rss_group_recycled_schedule(post["rss_item_id"], _normalize_datetime_value(scheduled_at), new_scheduled_at)
-            add_log(schedule["post_id"], "INFO", f"RSS group recycled schedule moved to {new_scheduled_at} from calendar.")
+            move_rss_group_schedule_occurrence(post["rss_item_id"], _normalize_datetime_value(scheduled_at), new_scheduled_at)
+            add_log(schedule["post_id"], "INFO", f"RSS group schedule occurrence moved to {new_scheduled_at} from calendar.")
         else:
             move_schedule_date(int(schedule_id), new_scheduled_at)
             add_log(schedule["post_id"], "INFO", f"Recycled schedule moved to {new_scheduled_at} from calendar.")
@@ -399,8 +410,8 @@ def reschedule_calendar_event():
         if post is None:
             abort(404)
         if post["rss_item_id"]:
-            move_rss_group_main_schedule(post["rss_item_id"], _normalize_datetime_value(scheduled_at), new_scheduled_at)
-            add_log(post["id"], "INFO", f"RSS group main schedule moved to {new_scheduled_at} from calendar.")
+            move_rss_group_schedule_occurrence(post["rss_item_id"], _normalize_datetime_value(scheduled_at), new_scheduled_at)
+            add_log(post["id"], "INFO", f"RSS group schedule occurrence moved to {new_scheduled_at} from calendar.")
         else:
             move_post_schedule_date(int(post_id), new_scheduled_at)
     else:
@@ -510,10 +521,12 @@ def edit_rss_article(rss_item_id):
         if request.form.get("publish_after_save") == "1":
             _, updated_posts = get_rss_group(rss_item_id)
             result = publish_rss_group_now(updated_posts)
-            if result["published"] and not result["failed"]:
+            if result["published"] and not result["failed"] and not result.get("skipped"):
                 flash(f"Article versions saved and {result['published']} version(s) published.", "success")
             elif result["published"]:
-                flash(f"Article versions saved. Published {result['published']} version(s); {result['failed']} failed. Check logs.", "warning")
+                flash(_publish_group_summary("Article versions saved.", result), "warning")
+            elif result.get("skipped"):
+                flash(_publish_group_summary("Article versions saved.", result), "warning")
             else:
                 flash("Article versions saved, but publication failed for every version. Check logs.", "warning")
         else:
@@ -649,10 +662,12 @@ def publish_rss_article_now(rss_item_id):
     if item is None:
         abort(404)
     result = publish_rss_group_now(posts)
-    if result["published"] and not result["failed"]:
+    if result["published"] and not result["failed"] and not result.get("skipped"):
         flash(f"Published {result['published']} version(s).", "success")
     elif result["published"]:
-        flash(f"Published {result['published']} version(s); {result['failed']} failed. Check logs.", "warning")
+        flash(_publish_group_summary("", result), "warning")
+    elif result.get("skipped"):
+        flash(_publish_group_summary("", result), "warning")
     else:
         flash("Publication failed for every version. Check logs.", "warning")
     return redirect(url_for("main.posts"))

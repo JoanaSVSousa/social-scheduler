@@ -190,6 +190,11 @@ def move_rss_group_recycled_schedule(rss_item_id, old_scheduled_at, new_schedule
         )
 
 
+def move_rss_group_schedule_occurrence(rss_item_id, old_scheduled_at, new_scheduled_at):
+    move_rss_group_main_schedule(rss_item_id, old_scheduled_at, new_scheduled_at)
+    move_rss_group_recycled_schedule(rss_item_id, old_scheduled_at, new_scheduled_at)
+
+
 def delete_rss_group(rss_item_id):
     with get_connection() as conn:
         post_rows = conn.execute("SELECT id FROM posts WHERE rss_item_id = ?", (rss_item_id,)).fetchall()

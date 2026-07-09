@@ -1,5 +1,5 @@
 from .media import get_media_for_post
-from .platform_publishers import publish_to_platform
+from .platform_publishers import is_platform_publishable, publish_to_platform
 from .scheduler import add_log, get_due_posts, get_post, mark_post_status
 from .schedules import get_due_schedules, mark_schedule_status
 
@@ -14,7 +14,7 @@ def process_publication_queue():
         if result["ok"]:
             mark_schedule_status(schedule["id"], "Published")
             published += 1
-        else:
+        elif not result.get("skipped"):
             mark_schedule_status(schedule["id"], "Failed")
 
     for post in due_posts:
@@ -40,6 +40,10 @@ def publish_post_by_id(post_id, reason):
 
 
 def publish_post(post, reason):
+    if not is_platform_publishable(post["platform"]):
+        message = f"Real API publishing is not implemented yet for {post['platform']}."
+        add_log(post["id"], "INFO", f"{reason} Skipped. {message}")
+        return {"ok": False, "skipped": True, "message": message, "post_id": post["id"]}
     try:
         uri = _publish_post(post, reason)
     except Exception as exc:
@@ -52,15 +56,22 @@ def publish_post(post, reason):
 def publish_rss_group_now(posts):
     published = 0
     failed = 0
+    skipped = 0
     messages = []
     for post in posts:
+        if not is_platform_publishable(post["platform"]):
+            skipped += 1
+            message = f"{post['platform']}: real API publishing is not implemented yet."
+            messages.append(message)
+            add_log(post["id"], "INFO", f"Manual publish requested for RSS article group. Skipped. {message}")
+            continue
         result = publish_post(post, "Manual publish requested for RSS article group.")
         if result["ok"]:
             published += 1
         else:
             failed += 1
             messages.append(f"{post['platform']}: {result['message']}")
-    return {"published": published, "failed": failed, "messages": messages}
+    return {"published": published, "failed": failed, "skipped": skipped, "messages": messages}
 
 
 def _publish_post(post, reason):

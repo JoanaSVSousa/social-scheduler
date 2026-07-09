@@ -1,9 +1,10 @@
 from datetime import datetime, timezone
+from html import unescape
 import json
 import mimetypes
 import re
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
 
 from ..database import get_connection
@@ -14,6 +15,13 @@ from .social_accounts import decrypt_credentials_for_publisher
 
 class PublicationError(Exception):
     pass
+
+
+IMPLEMENTED_PUBLISHERS = {"Bluesky"}
+
+
+def is_platform_publishable(platform):
+    return platform in IMPLEMENTED_PUBLISHERS
 
 
 def publish_to_platform(post, media_items):
@@ -157,10 +165,13 @@ def _source_link_for_post(post):
                 (rss_item_id,),
             ).fetchone()
         if item:
+            image_url = item["image_url"] or _find_page_image_url(item["url"])
+            if image_url and image_url != item["image_url"]:
+                _remember_rss_item_image(rss_item_id, image_url)
             return {
                 "title": item["title"],
                 "url": item["url"],
-                "image_url": item["image_url"],
+                "image_url": image_url,
                 "description": post["content"],
             }
 
@@ -182,6 +193,49 @@ def _post_value(post, key, fallback=None):
         return post[key]
     except (KeyError, TypeError):
         return fallback
+
+
+def _find_page_image_url(page_url):
+    try:
+        request = Request(
+            page_url,
+            headers={"User-Agent": "ContentAutomationPlatform/1.0 (+https://squared-potato.pt)"},
+        )
+        with urlopen(request, timeout=12) as response:
+            html = response.read(500_000).decode("utf-8", errors="replace")
+    except (HTTPError, URLError, TimeoutError, ValueError):
+        return ""
+
+    image_url = (
+        _html_meta_content(html, "property", "og:image")
+        or _html_meta_content(html, "name", "twitter:image")
+        or _first_image_src(html)
+    )
+    return urljoin(page_url, image_url) if image_url else ""
+
+
+def _html_meta_content(html, attribute_name, attribute_value):
+    pattern = (
+        rf"<meta[^>]+{attribute_name}=[\"']{re.escape(attribute_value)}[\"'][^>]+content=[\"']([^\"']+)[\"']"
+        rf"|<meta[^>]+content=[\"']([^\"']+)[\"'][^>]+{attribute_name}=[\"']{re.escape(attribute_value)}[\"']"
+    )
+    match = re.search(pattern, html, re.IGNORECASE)
+    if not match:
+        return ""
+    return unescape(next(group for group in match.groups() if group)).strip()
+
+
+def _first_image_src(html):
+    match = re.search(r"<img[^>]+src=[\"']([^\"']+)[\"']", html, re.IGNORECASE)
+    return unescape(match.group(1)).strip() if match else ""
+
+
+def _remember_rss_item_image(rss_item_id, image_url):
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE rss_items SET image_url = ? WHERE id = ? AND (image_url IS NULL OR image_url = '')",
+            (image_url, rss_item_id),
+        )
 
 
 def _upload_bluesky_remote_thumb(pds_url, access_jwt, image_url):
