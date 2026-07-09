@@ -59,11 +59,13 @@ SOCIAL_ACCOUNT_SCHEMAS = {
         ],
     },
     "Threads": {
-        "description": "Threads publishing uses Meta/Threads credentials: a Threads user ID and access token.",
+        "description": "Threads publishing uses a Threads User ID and a user access token with Threads publishing permissions. App ID/App Secret identify the Meta app but do not publish by themselves.",
         "auth_options": [("threads_api", "Threads API")],
         "fields": [
+            {"name": "app_id", "label": "Meta App ID", "placeholder": "Optional Meta App ID", "example": "Numeric Meta app id"},
+            {"name": "app_secret", "label": "Meta App Secret", "placeholder": "Optional Meta App Secret", "example": "Meta app secret string"},
             {"name": "threads_user_id", "label": "Threads User ID", "placeholder": "Threads user ID", "example": "Numeric Threads user id"},
-            {"name": "access_token", "label": "Access Token", "placeholder": "Paste Threads access token", "example": "Threads/Meta access token"},
+            {"name": "access_token", "label": "User Access Token", "placeholder": "Paste Threads access token", "example": "Needs Threads publishing permissions, for example threads_basic and threads_content_publish"},
         ],
     },
     "Bluesky": {

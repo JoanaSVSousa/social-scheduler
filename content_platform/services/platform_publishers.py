@@ -11,7 +11,7 @@ import secrets
 from tempfile import gettempdir
 import time
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote, urljoin, urlparse
+from urllib.parse import quote, urlencode, urljoin, urlparse
 from urllib.request import Request, urlopen
 
 from ..database import get_connection
@@ -25,7 +25,16 @@ class PublicationError(Exception):
     pass
 
 
-IMPLEMENTED_PUBLISHERS = {"Bluesky", "X"}
+IMPLEMENTED_PUBLISHERS = {
+    "Bluesky",
+    "Facebook",
+    "Instagram",
+    "LinkedIn",
+    "Threads",
+    "TikTok",
+    "X",
+    "YouTube Shorts",
+}
 
 
 def is_platform_publishable(platform):
@@ -35,9 +44,204 @@ def is_platform_publishable(platform):
 def publish_to_platform(post, media_items):
     if post["platform"] == "Bluesky":
         return publish_to_bluesky(post, media_items)
+    if post["platform"] == "Facebook":
+        return publish_to_facebook(post, media_items)
+    if post["platform"] == "Instagram":
+        return publish_to_instagram(post, media_items)
+    if post["platform"] == "LinkedIn":
+        return publish_to_linkedin(post, media_items)
+    if post["platform"] == "Threads":
+        return publish_to_threads(post, media_items)
+    if post["platform"] == "TikTok":
+        return publish_to_tiktok(post, media_items)
     if post["platform"] == "X":
         return publish_to_x(post, media_items)
+    if post["platform"] == "YouTube Shorts":
+        return publish_to_youtube_shorts(post, media_items)
     raise PublicationError(f"Real API publishing is not implemented yet for {post['platform']}.")
+
+
+def publish_to_threads(post, media_items):
+    account = decrypt_credentials_for_publisher("Threads")
+    if not account:
+        raise PublicationError("Threads credentials are not configured.")
+
+    credentials = account["credentials"]
+    threads_user_id = credentials.get("threads_user_id") or account.get("account_handle")
+    access_token = credentials.get("access_token")
+    if not threads_user_id or not access_token:
+        raise PublicationError("Threads needs a Threads User ID and a user access token with publishing permissions.")
+    if media_items:
+        raise PublicationError(
+            "Threads media publishing needs a public image_url/video_url. Local uploaded media is not public yet; publish a text/link post or add public media storage first."
+        )
+
+    text = compose_publication_text("Threads", post["content"], post["hashtags"])
+    if not text:
+        raise PublicationError("Post content is empty. The title is internal and is not published.")
+    if len(text) > 500:
+        raise PublicationError("Threads posts must be 500 characters or less. Shorten this version before publishing.")
+
+    container = _post_form(
+        f"https://graph.threads.net/v1.0/{threads_user_id}/threads",
+        {"media_type": "TEXT", "text": text, "access_token": access_token},
+        endpoint_name="Threads create container",
+        error_label="Threads API",
+    )
+    creation_id = container.get("id")
+    if not creation_id:
+        raise PublicationError("Threads did not return a creation container id.")
+
+    response = _post_form(
+        f"https://graph.threads.net/v1.0/{threads_user_id}/threads_publish",
+        {"creation_id": creation_id, "access_token": access_token},
+        endpoint_name="Threads publish container",
+        error_label="Threads API",
+    )
+    post_id = response.get("id")
+    return f"Threads post created: {post_id}" if post_id else "Threads post created."
+
+
+def publish_to_facebook(post, media_items):
+    account = decrypt_credentials_for_publisher("Facebook")
+    if not account:
+        raise PublicationError("Facebook credentials are not configured.")
+
+    credentials = account["credentials"]
+    page_id = credentials.get("page_id") or account.get("account_handle")
+    access_token = credentials.get("access_token")
+    if not page_id or not access_token:
+        raise PublicationError("Facebook needs a Page ID and a Page access token with publishing permissions.")
+    if media_items:
+        raise PublicationError(
+            "Facebook media publishing from local uploads needs public media hosting or multipart upload support. Publish link/text first or add public media storage first."
+        )
+
+    text = compose_publication_text("Facebook", post["content"], post["hashtags"])
+    if not text:
+        raise PublicationError("Post content is empty. The title is internal and is not published.")
+
+    payload = {"message": text, "access_token": access_token}
+    source = _source_link_for_post(post)
+    if source and source.get("url"):
+        payload["link"] = source["url"]
+    response = _post_form(
+        f"https://graph.facebook.com/v20.0/{page_id}/feed",
+        payload,
+        endpoint_name="Facebook Page feed publish",
+        error_label="Facebook API",
+    )
+    post_id = response.get("id")
+    return f"https://facebook.com/{post_id}" if post_id else "Facebook Page post created."
+
+
+def publish_to_instagram(post, media_items):
+    account = decrypt_credentials_for_publisher("Instagram")
+    if not account:
+        raise PublicationError("Instagram credentials are not configured.")
+
+    credentials = account["credentials"]
+    instagram_id = credentials.get("instagram_business_id") or account.get("account_handle")
+    access_token = credentials.get("access_token")
+    if not instagram_id or not access_token:
+        raise PublicationError("Instagram needs an Instagram Business ID and a Meta access token with content publishing permissions.")
+
+    normalized_format = (post["content_format"] or "").lower()
+    if any(label in normalized_format for label in ["story", "reel", "video"]):
+        raise PublicationError("Instagram Reels, Stories, and video publishing need public video URLs. This MVP currently supports feed image publishing from public RSS/article images.")
+    if media_items:
+        raise PublicationError(
+            "Instagram Graph publishing needs a public image_url/video_url. Local uploaded media is not public yet; add public media storage before publishing uploaded files."
+        )
+
+    source = _source_link_for_post(post)
+    image_url = (source or {}).get("image_url")
+    if not image_url:
+        raise PublicationError("Instagram feed publishing needs a public image URL. RSS/article image was not found for this post.")
+
+    caption = compose_publication_text("Instagram", post["content"], post["hashtags"])
+    if not caption:
+        raise PublicationError("Post content is empty. The title is internal and is not published.")
+
+    container = _post_form(
+        f"https://graph.facebook.com/v20.0/{instagram_id}/media",
+        {"image_url": image_url, "caption": caption, "access_token": access_token},
+        endpoint_name="Instagram create media container",
+        error_label="Instagram API",
+    )
+    creation_id = container.get("id")
+    if not creation_id:
+        raise PublicationError("Instagram did not return a media container id.")
+
+    response = _post_form(
+        f"https://graph.facebook.com/v20.0/{instagram_id}/media_publish",
+        {"creation_id": creation_id, "access_token": access_token},
+        endpoint_name="Instagram publish media",
+        error_label="Instagram API",
+    )
+    media_id = response.get("id")
+    return f"Instagram media published: {media_id}" if media_id else "Instagram media published."
+
+
+def publish_to_linkedin(post, media_items):
+    account = decrypt_credentials_for_publisher("LinkedIn")
+    if not account:
+        raise PublicationError("LinkedIn credentials are not configured.")
+
+    credentials = account["credentials"]
+    access_token = credentials.get("access_token")
+    author = _linkedin_author_urn(credentials.get("organization_id") or account.get("account_handle"))
+    if not access_token or not author:
+        raise PublicationError("LinkedIn needs an access token and an organization/person URN.")
+    if media_items:
+        raise PublicationError("LinkedIn media publishing needs asset registration/upload support. This MVP currently supports text/link posts.")
+
+    text = compose_publication_text("LinkedIn", post["content"], post["hashtags"])
+    if not text:
+        raise PublicationError("Post content is empty. The title is internal and is not published.")
+
+    source = _source_link_for_post(post)
+    share_content = {
+        "shareCommentary": {"text": text},
+        "shareMediaCategory": "NONE",
+    }
+    if source and source.get("url"):
+        share_content["shareMediaCategory"] = "ARTICLE"
+        share_content["media"] = [
+            {
+                "status": "READY",
+                "originalUrl": source["url"],
+                "title": {"text": (source.get("title") or post["title"])[:200]},
+            }
+        ]
+
+    payload = {
+        "author": author,
+        "lifecycleState": "PUBLISHED",
+        "specificContent": {"com.linkedin.ugc.ShareContent": share_content},
+        "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"},
+    }
+    response = _post_json(
+        "https://api.linkedin.com/v2/ugcPosts",
+        payload,
+        access_jwt=access_token,
+        endpoint_name="LinkedIn create UGC post",
+        error_label="LinkedIn API",
+        extra_headers={"X-Restli-Protocol-Version": "2.0.0"},
+    )
+    return response.get("id") or "LinkedIn post created."
+
+
+def publish_to_youtube_shorts(post, media_items):
+    if not decrypt_credentials_for_publisher("YouTube Shorts"):
+        raise PublicationError("YouTube Shorts credentials are not configured.")
+    raise PublicationError("YouTube Shorts publishing needs a resumable video upload workflow. Credentials can be stored now; upload publishing is the next implementation step.")
+
+
+def publish_to_tiktok(post, media_items):
+    if not decrypt_credentials_for_publisher("TikTok"):
+        raise PublicationError("TikTok credentials are not configured.")
+    raise PublicationError("TikTok publishing needs the Content Posting API upload/init flow. Credentials can be stored now; upload publishing is the next implementation step.")
 
 
 def publish_to_bluesky(post, media_items):
@@ -161,6 +365,17 @@ def _x_oauth1_header(method, url, credentials):
 
 def _oauth_quote(value):
     return quote(str(value), safe="~")
+
+
+def _linkedin_author_urn(value):
+    value = (value or "").strip()
+    if not value:
+        return ""
+    if value.startswith("urn:li:"):
+        return value
+    if value.isdigit():
+        return f"urn:li:organization:{value}"
+    return value
 
 
 def _compose_bluesky_text(post):
@@ -400,13 +615,29 @@ def _normalize_bluesky_pds_url(value):
     return f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
 
 
-def _post_json(url, payload, access_jwt=None, auth_header=None, endpoint_name="request", error_label="Bluesky API"):
+def _post_json(
+    url,
+    payload,
+    access_jwt=None,
+    auth_header=None,
+    endpoint_name="request",
+    error_label="Bluesky API",
+    extra_headers=None,
+):
     data = json.dumps(payload).encode("utf-8")
     headers = {"Content-Type": "application/json"}
+    if extra_headers:
+        headers.update(extra_headers)
     if auth_header:
         headers["Authorization"] = auth_header
     elif access_jwt:
         headers["Authorization"] = f"Bearer {access_jwt}"
+    return _request_json(Request(url, data=data, headers=headers, method="POST"), endpoint_name, error_label)
+
+
+def _post_form(url, payload, endpoint_name="request", error_label="API"):
+    data = urlencode(payload).encode("utf-8")
+    headers = {"Content-Type": "application/x-www-form-urlencoded"}
     return _request_json(Request(url, data=data, headers=headers, method="POST"), endpoint_name, error_label)
 
 
@@ -418,7 +649,8 @@ def _post_bytes(url, payload, content_type, access_jwt, endpoint_name="request",
 def _request_json(request, endpoint_name, error_label):
     try:
         with urlopen(request, timeout=20) as response:
-            return json.loads(response.read().decode("utf-8"))
+            body = response.read().decode("utf-8")
+            return json.loads(body) if body.strip() else {}
     except HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
         if error_label == "X API" and exc.code in {401, 403}:
@@ -436,7 +668,14 @@ def _clean_error_detail(detail):
     except json.JSONDecodeError:
         payload = None
     if isinstance(payload, dict):
-        return payload.get("message") or payload.get("error") or json.dumps(payload)
+        error = payload.get("error")
+        if isinstance(error, dict):
+            message = error.get("message") or json.dumps(error)
+            code = error.get("code")
+            error_type = error.get("type")
+            details = " ".join(str(value) for value in [error_type, f"code {code}" if code else ""] if value)
+            return f"{message} {details}".strip()
+        return payload.get("message") or error or json.dumps(payload)
 
     text = re.sub(r"<[^>]+>", " ", detail)
     text = re.sub(r"\s+", " ", text).strip()
