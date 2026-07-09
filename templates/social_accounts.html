@@ -46,7 +46,7 @@
                 </div>
                 <label>
                     Auth type
-                    <select name="auth_type">
+                    <select name="auth_type" data-auth-type-select>
                         {% for value, label in schema.auth_options %}
                         <option value="{{ value }}" {% if account and account.auth_type == value %}selected{% endif %}>{{ label }}</option>
                         {% endfor %}
@@ -55,7 +55,7 @@
                 <p class="field-help">{{ schema.description }}</p>
                 <div class="credential-grid">
                     {% for field in schema.fields %}
-                    <label>
+                    <label data-auth-field data-auth-types="{{ field.auth_types|default([])|join(',') }}">
                         {{ field.label }}
                         <input
                             type="password"
@@ -71,7 +71,7 @@
                 </div>
                 <div class="credential-summary">
                     {% for field in schema.fields %}
-                    <span class="credential-pill {% if summary.get(field.name) %}saved{% endif %}">
+                    <span class="credential-pill {% if summary.get(field.name) %}saved{% endif %}" data-auth-field data-auth-types="{{ field.auth_types|default([])|join(',') }}">
                         {{ field.label }}: {% if summary.get(field.name) %}saved{% else %}empty{% endif %}
                     </span>
                     {% endfor %}
@@ -92,4 +92,27 @@
         {% endfor %}
     </div>
 </section>
+<script>
+document.querySelectorAll(".social-account-form").forEach((form) => {
+    const authSelect = form.querySelector("[data-auth-type-select]");
+    if (!authSelect) {
+        return;
+    }
+
+    function syncAuthFields() {
+        const selectedAuth = authSelect.value;
+        form.querySelectorAll("[data-auth-field]").forEach((field) => {
+            const authTypes = (field.dataset.authTypes || "").split(",").filter(Boolean);
+            const isVisible = !authTypes.length || authTypes.includes(selectedAuth);
+            field.hidden = !isVisible;
+            field.querySelectorAll("input").forEach((input) => {
+                input.disabled = !isVisible;
+            });
+        });
+    }
+
+    authSelect.addEventListener("change", syncAuthFields);
+    syncAuthFields();
+});
+</script>
 {% endblock %}

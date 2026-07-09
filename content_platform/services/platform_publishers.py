@@ -416,6 +416,8 @@ def _request_json(request, endpoint_name, error_label):
             return json.loads(response.read().decode("utf-8"))
     except HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
+        if error_label == "X API" and exc.code in {401, 403}:
+            detail = f"{_clean_error_detail(detail)} {_x_auth_help()}"
         raise PublicationError(f"{error_label} {endpoint_name} error {exc.code}: {_clean_error_detail(detail)}") from exc
     except (URLError, TimeoutError) as exc:
         raise PublicationError(f"{error_label} {endpoint_name} request failed: {exc}") from exc
@@ -436,3 +438,11 @@ def _clean_error_detail(detail):
     if "404: Not Found" in text or "Error 404" in text:
         return "Endpoint not found. Check that Bluesky PDS URL is https://bsky.social, not bsky.app or a profile URL."
     return text[:500] or "No response body."
+
+
+def _x_auth_help():
+    return (
+        "Check X credentials: OAuth1 uses API Key/API Key Secret, not OAuth2 Client ID/Client Secret; "
+        "the app must have Read and Write permissions; regenerate the user Access Token and Access Token Secret "
+        "after changing permissions. OAuth2 must be User Context with tweet.write, not application-only bearer."
+    )
