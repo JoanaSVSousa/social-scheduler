@@ -1,12 +1,17 @@
+import base64
 from datetime import datetime, timezone
+import hashlib
 from html import unescape
+import hmac
 import json
 import mimetypes
 from pathlib import Path
 import re
+import secrets
 from tempfile import gettempdir
+import time
 from urllib.error import HTTPError, URLError
-from urllib.parse import urljoin, urlparse
+from urllib.parse import quote, urljoin, urlparse
 from urllib.request import Request, urlopen
 
 from ..database import get_connection
@@ -92,9 +97,12 @@ def publish_to_x(post, media_items):
         raise PublicationError("X credentials are not configured.")
 
     credentials = account["credentials"]
-    access_token = credentials.get("oauth2_user_token") or credentials.get("bearer_token") or credentials.get("access_token")
-    if not access_token:
-        raise PublicationError("X needs an OAuth2 User Access Token with tweet.write permission.")
+    oauth_header = _x_oauth1_header("POST", "https://api.x.com/2/tweets", credentials)
+    access_token = credentials.get("oauth2_user_token") or credentials.get("bearer_token")
+    if not oauth_header and not access_token:
+        raise PublicationError(
+            "X needs either OAuth 1.0a user credentials or an OAuth2 User Access Token with tweet.write permission."
+        )
 
     text = compose_publication_text("X", post["content"], post["hashtags"])
     if not text:
@@ -105,13 +113,49 @@ def publish_to_x(post, media_items):
     response = _post_json(
         "https://api.x.com/2/tweets",
         {"text": text},
-        access_jwt=access_token,
+        access_jwt=None if oauth_header else access_token,
+        auth_header=oauth_header,
         endpoint_name="X create post",
         error_label="X API",
     )
     post_id = (response.get("data") or {}).get("id")
     suffix = " Media upload for X is not implemented yet." if media_items else ""
     return f"https://x.com/i/web/status/{post_id}{suffix}" if post_id else f"X post created.{suffix}"
+
+
+def _x_oauth1_header(method, url, credentials):
+    required = ["api_key", "api_secret", "access_token", "access_token_secret"]
+    if any(not credentials.get(key) for key in required):
+        return ""
+
+    oauth_params = {
+        "oauth_consumer_key": credentials["api_key"],
+        "oauth_nonce": secrets.token_hex(16),
+        "oauth_signature_method": "HMAC-SHA1",
+        "oauth_timestamp": str(int(time.time())),
+        "oauth_token": credentials["access_token"],
+        "oauth_version": "1.0",
+    }
+    signature_params = "&".join(
+        f"{_oauth_quote(key)}={_oauth_quote(value)}"
+        for key, value in sorted(oauth_params.items())
+    )
+    parsed = urlparse(url)
+    base_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+    signature_base = "&".join(
+        [_oauth_quote(method.upper()), _oauth_quote(base_url), _oauth_quote(signature_params)]
+    )
+    signing_key = f"{_oauth_quote(credentials['api_secret'])}&{_oauth_quote(credentials['access_token_secret'])}"
+    digest = hmac.new(signing_key.encode("utf-8"), signature_base.encode("utf-8"), hashlib.sha1).digest()
+    oauth_params["oauth_signature"] = base64.b64encode(digest).decode("utf-8")
+    return "OAuth " + ", ".join(
+        f'{_oauth_quote(key)}="{_oauth_quote(value)}"'
+        for key, value in sorted(oauth_params.items())
+    )
+
+
+def _oauth_quote(value):
+    return quote(str(value), safe="~")
 
 
 def _compose_bluesky_text(post):
@@ -351,10 +395,12 @@ def _normalize_bluesky_pds_url(value):
     return f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
 
 
-def _post_json(url, payload, access_jwt=None, endpoint_name="request", error_label="Bluesky API"):
+def _post_json(url, payload, access_jwt=None, auth_header=None, endpoint_name="request", error_label="Bluesky API"):
     data = json.dumps(payload).encode("utf-8")
     headers = {"Content-Type": "application/json"}
-    if access_jwt:
+    if auth_header:
+        headers["Authorization"] = auth_header
+    elif access_jwt:
         headers["Authorization"] = f"Bearer {access_jwt}"
     return _request_json(Request(url, data=data, headers=headers, method="POST"), endpoint_name, error_label)
 

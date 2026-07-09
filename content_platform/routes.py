@@ -48,6 +48,7 @@ from .services.schedules import (
     replace_schedules,
 )
 from .services.scheduler import (
+    clone_post_to_platforms,
     create_post,
     delete_post,
     add_log,
@@ -563,7 +564,8 @@ def new_post():
         replace_schedules(post_id, _schedule_dates_from_form())
         saved, skipped = save_media_files(post_id, request.files.getlist("media_files"), request.form.get("content_format", ""))
         _flash_media_result(saved, skipped)
-        return redirect(url_for("main.posts"))
+        flash("Post created. You can keep editing or publish it when ready.", "success")
+        return redirect(url_for("main.edit_post", post_id=post_id))
 
     return render_template(
         "post_form.html",
@@ -600,7 +602,18 @@ def edit_post(post_id):
                 flash("Post saved and published successfully.", "success")
             else:
                 flash(f"Post saved, but publication failed: {result['message']}", "warning")
-        return redirect(url_for("main.posts"))
+        else:
+            flash("Post updated.", "success")
+        if request.form.get("add_network_versions") == "1":
+            selected_platforms = request.form.getlist("additional_platforms")
+            if any(platform not in PLATFORMS for platform in selected_platforms):
+                abort(400)
+            created = clone_post_to_platforms(post_id, selected_platforms)
+            if created:
+                flash(f"Created {len(created)} additional network version(s).", "success")
+            else:
+                flash("No additional network versions were created.", "warning")
+        return redirect(url_for("main.edit_post", post_id=post_id))
 
     return render_template(
         "post_form.html",
@@ -963,6 +976,7 @@ def _schedule_dates_from_form():
         dates.append(primary)
     extra_dates = request.form.get("schedule_dates", "")
     dates.extend(_normalize_datetime_value(line.strip()) for line in extra_dates.splitlines() if line.strip())
+    dates.extend(_recurring_dates_from_form(""))
     return dates
 
 

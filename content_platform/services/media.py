@@ -106,9 +106,13 @@ def delete_media(media_id):
         if media is None:
             return
         conn.execute("DELETE FROM media_assets WHERE id = ?", (media_id,))
+        remaining = conn.execute(
+            "SELECT id FROM media_assets WHERE filename = ? LIMIT 1",
+            (media["filename"],),
+        ).fetchone()
 
     path = (UPLOAD_DIR / media["filename"]).resolve()
-    if UPLOAD_DIR.resolve() in path.parents and path.exists():
+    if remaining is None and UPLOAD_DIR.resolve() in path.parents and path.exists():
         path.unlink()
 
 

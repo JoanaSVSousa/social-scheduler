@@ -75,6 +75,45 @@
         <span class="field-help">One date per line. Use this when the same post should be published more than once.</span>
     </label>
 
+    <div class="form-row">
+        <label>
+            Repeat from date
+            <input type="date" name="repeat_date">
+        </label>
+        <label>
+            Repeat from time
+            <input type="time" name="repeat_time">
+        </label>
+        <label>
+            Times
+            <input type="number" name="repeat_count" min="1" max="24" placeholder="4">
+        </label>
+        <label>
+            Every N days
+            <input type="number" name="repeat_interval_days" min="1" max="365" placeholder="14">
+        </label>
+    </div>
+
+    {% if post %}
+    <section class="source-panel">
+        <div>
+            <strong>Add network versions</strong>
+            <small>Create extra editable versions from this post. Copy, schedules, and attached media are cloned.</small>
+        </div>
+        <div class="checkbox-grid">
+            {% for platform in platforms %}
+            {% if platform != post.platform %}
+            <label class="checkbox-pill">
+                <input type="checkbox" name="additional_platforms" value="{{ platform }}">
+                {{ platform }}
+            </label>
+            {% endif %}
+            {% endfor %}
+        </div>
+        <button class="button" type="submit" name="add_network_versions" value="1">Save and add network versions</button>
+    </section>
+    {% endif %}
+
     <section class="media-panel">
         <div>
             <h2>Media</h2>

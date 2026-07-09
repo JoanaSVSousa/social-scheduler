@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from ..database import get_connection, insert_and_get_id
+from ..models import default_content_format, truncate_content_for_platform
 
 
 def get_all_posts(filters=None):
@@ -84,6 +85,85 @@ def update_post(post_id, post):
         )
 
     add_log(post_id, "INFO", f"Post updated with status {post.status}.")
+
+
+def clone_post_to_platforms(post_id, platforms):
+    source = get_post(post_id)
+    if source is None:
+        return []
+
+    requested_platforms = [platform for platform in platforms if platform and platform != source["platform"]]
+    if not requested_platforms:
+        return []
+
+    created = []
+    with get_connection() as conn:
+        media_rows = conn.execute(
+            "SELECT filename, original_filename, media_type FROM media_assets WHERE post_id = ? ORDER BY id ASC",
+            (post_id,),
+        ).fetchall()
+        schedule_rows = conn.execute(
+            "SELECT scheduled_at FROM post_schedules WHERE post_id = ? ORDER BY scheduled_at ASC",
+            (post_id,),
+        ).fetchall()
+
+        for platform in requested_platforms:
+            content_format = default_content_format(platform)
+            content = truncate_content_for_platform(platform, source["content"], source["hashtags"])
+            existing = conn.execute(
+                """
+                SELECT id FROM posts
+                WHERE rss_item_id IS NULL
+                  AND platform = ?
+                  AND title = ?
+                  AND content = ?
+                LIMIT 1
+                """,
+                (platform, source["title"], content),
+            ).fetchone()
+            if existing:
+                continue
+            cloned_post_id = insert_and_get_id(
+                conn,
+                """
+                INSERT INTO posts (
+                    title, content, hashtags, platform, content_format,
+                    rss_item_id, source_type, scheduled_at, status
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    source["title"],
+                    content,
+                    source["hashtags"],
+                    platform,
+                    content_format,
+                    None,
+                    source["source_type"],
+                    source["scheduled_at"],
+                    "Draft",
+                ),
+            )
+            for media in media_rows:
+                conn.execute(
+                    """
+                    INSERT INTO media_assets (post_id, filename, original_filename, media_type)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (cloned_post_id, media["filename"], media["original_filename"], media["media_type"]),
+                )
+            for schedule in schedule_rows:
+                conn.execute(
+                    "INSERT INTO post_schedules (post_id, scheduled_at, status) VALUES (?, ?, 'Scheduled')",
+                    (cloned_post_id, schedule["scheduled_at"]),
+                )
+            conn.execute(
+                "INSERT INTO logs (post_id, level, message) VALUES (?, ?, ?)",
+                (cloned_post_id, "INFO", f"Manual post cloned from #{post_id} for {platform}."),
+            )
+            created.append(cloned_post_id)
+
+    return created
 
 
 def update_post_text(post_id, title, content, hashtags):

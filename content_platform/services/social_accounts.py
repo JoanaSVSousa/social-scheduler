@@ -43,15 +43,15 @@ SOCIAL_ACCOUNT_SCHEMAS = {
         ],
     },
     "X": {
-        "description": "X posting uses an OAuth 2.0 User Access Token for /2/tweets. API key/secret are stored for the app context; the user access token is what publishes.",
+        "description": "X posting uses user-context auth. For this MVP, OAuth 1.0a user credentials are recommended: API key, API secret, access token, and access token secret.",
         "auth_options": [("oauth1", "OAuth 1.0a user tokens"), ("oauth2", "OAuth 2.0")],
         "fields": [
-            {"name": "api_key", "label": "API Key", "placeholder": "Consumer/API key", "example": "From X Developer Portal"},
-            {"name": "api_secret", "label": "API Secret", "placeholder": "Consumer/API secret", "example": "Also called API Key Secret"},
-            {"name": "oauth2_user_token", "label": "OAuth2 User Access Token", "placeholder": "Paste OAuth2 user access token", "example": "Bearer user token with tweet.write scope"},
-            {"name": "access_token", "label": "OAuth1 Access Token", "placeholder": "Optional OAuth1 user token", "example": "OAuth 1.0a user token, kept for later media/upload support"},
-            {"name": "access_token_secret", "label": "Access Token Secret", "placeholder": "User access token secret", "example": "OAuth 1.0a user token secret"},
-            {"name": "bearer_token", "label": "Fallback Bearer Token", "placeholder": "Optional bearer/user token", "example": "Use only if it is a user token with write permissions"},
+            {"name": "api_key", "label": "API Key", "placeholder": "Consumer/API key", "example": "Required for OAuth1. From X Developer Portal."},
+            {"name": "api_secret", "label": "API Secret", "placeholder": "Consumer/API secret", "example": "Required for OAuth1. Also called API Key Secret."},
+            {"name": "access_token", "label": "OAuth1 Access Token", "placeholder": "User access token", "example": "Required for OAuth1 User Context."},
+            {"name": "access_token_secret", "label": "Access Token Secret", "placeholder": "User access token secret", "example": "Required for OAuth1 User Context."},
+            {"name": "oauth2_user_token", "label": "OAuth2 User Access Token", "placeholder": "Optional OAuth2 user token", "example": "Must be user-context with tweet.write, not application-only bearer."},
+            {"name": "bearer_token", "label": "Fallback Bearer Token", "placeholder": "Optional user bearer token", "example": "Only works if this is OAuth2 User Context, not app-only."},
         ],
     },
     "Threads": {
