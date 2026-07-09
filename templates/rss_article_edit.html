@@ -25,8 +25,19 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
     <section class="source-panel">
-        <strong>Networks for this article</strong>
-        <small>Select where this article should exist as an editable post version.</small>
+        <div class="source-settings-row">
+            <div>
+                <strong>Networks for this article</strong>
+                <small>Select where this article should exist as an editable post version.</small>
+            </div>
+            <label>
+                Article type
+                <select name="content_type">
+                    <option value="Regular" {% if item.content_type == "Regular" %}selected{% endif %}>Regular</option>
+                    <option value="News" {% if item.content_type == "News" %}selected{% endif %}>News</option>
+                </select>
+            </label>
+        </div>
         <div class="checkbox-grid">
             {% for platform in platforms %}
             <label class="checkbox-pill">

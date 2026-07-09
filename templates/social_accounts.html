@@ -16,18 +16,21 @@
         {% set account = social_accounts.get(platform) %}
         {% set summary = social_credential_summaries.get(platform, {}) %}
         {% set schema = social_account_schemas.get(platform) %}
-        <article class="social-account-card">
-            <div class="social-account-header">
+        <details class="social-account-card">
+            <summary class="social-account-header">
                 <div>
                     <span>{{ platform }}</span>
                     <strong>{{ platform_counts.get(platform, 0) }}</strong>
                 </div>
-                {% if account %}
-                <span class="status scheduled">{{ account.connection_status }}</span>
-                {% else %}
-                <span class="status draft">Not connected</span>
-                {% endif %}
-            </div>
+                <div class="social-account-summary-actions">
+                    {% if account %}
+                    <span class="status scheduled">{{ account.connection_status }}</span>
+                    {% else %}
+                    <span class="status draft">Not connected</span>
+                    {% endif %}
+                    <span class="expand-label">Expand</span>
+                </div>
+            </summary>
 
             <form method="post" action="{{ url_for('main.save_social_account_settings', platform=platform) }}" class="social-account-form">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -83,7 +86,7 @@
                 <button class="button danger" type="submit">Remove credentials</button>
             </form>
             {% endif %}
-        </article>
+        </details>
         {% else %}
         <p>No platform data yet.</p>
         {% endfor %}

@@ -142,6 +142,54 @@ def update_rss_group_posts(post_updates):
             )
 
 
+def update_rss_group_content_type(rss_item_id, content_type):
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE rss_items SET content_type = ? WHERE id = ?",
+            (content_type, rss_item_id),
+        )
+        conn.execute(
+            """
+            UPDATE posts
+            SET source_type = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE rss_item_id = ?
+            """,
+            (content_type, rss_item_id),
+        )
+        conn.execute(
+            "INSERT INTO logs (post_id, level, message) VALUES (?, ?, ?)",
+            (None, "INFO", f"RSS article group #{rss_item_id} marked as {content_type}."),
+        )
+
+
+def move_rss_group_main_schedule(rss_item_id, old_scheduled_at, new_scheduled_at):
+    with get_connection() as conn:
+        conn.execute(
+            """
+            UPDATE posts
+            SET scheduled_at = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE rss_item_id = ?
+              AND scheduled_at = ?
+            """,
+            (new_scheduled_at, rss_item_id, old_scheduled_at),
+        )
+
+
+def move_rss_group_recycled_schedule(rss_item_id, old_scheduled_at, new_scheduled_at):
+    with get_connection() as conn:
+        conn.execute(
+            """
+            UPDATE post_schedules
+            SET scheduled_at = ?
+            WHERE scheduled_at = ?
+              AND post_id IN (
+                  SELECT id FROM posts WHERE rss_item_id = ?
+              )
+            """,
+            (new_scheduled_at, old_scheduled_at, rss_item_id),
+        )
+
+
 def delete_rss_group(rss_item_id):
     with get_connection() as conn:
         post_rows = conn.execute("SELECT id FROM posts WHERE rss_item_id = ?", (rss_item_id,)).fetchall()

@@ -6,6 +6,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
+from ..database import get_connection
 from .media import UPLOAD_DIR
 from .rich_text import compose_publication_text, detect_social_entities, utf8_byte_range
 from .social_accounts import decrypt_credentials_for_publisher
@@ -53,9 +54,11 @@ def publish_to_bluesky(post, media_items):
     if facets:
         record["facets"] = facets
 
-    image_embed = _build_bluesky_image_embed(pds_url, access_jwt, media_items)
-    if image_embed:
-        record["embed"] = image_embed
+    record_embed = _build_bluesky_image_embed(pds_url, access_jwt, media_items)
+    if not record_embed:
+        record_embed = _build_bluesky_external_embed(pds_url, access_jwt, post)
+    if record_embed:
+        record["embed"] = record_embed
 
     response = _post_json(
         f"{pds_url}/xrpc/com.atproto.repo.createRecord",
@@ -117,6 +120,92 @@ def _build_bluesky_image_embed(pds_url, access_jwt, media_items):
     if not images:
         return None
     return {"$type": "app.bsky.embed.images", "images": images}
+
+
+def _build_bluesky_external_embed(pds_url, access_jwt, post):
+    if not _should_use_external_embed(post):
+        return None
+
+    source = _source_link_for_post(post)
+    if not source:
+        return None
+
+    card = {
+        "uri": source["url"],
+        "title": source["title"] or post["title"],
+        "description": (source["description"] or post["content"] or "")[:300],
+    }
+    thumb = _upload_bluesky_remote_thumb(pds_url, access_jwt, source.get("image_url"))
+    if thumb:
+        card["thumb"] = thumb
+    return {"$type": "app.bsky.embed.external", "external": card}
+
+
+def _should_use_external_embed(post):
+    if post["platform"] != "Bluesky":
+        return False
+    normalized_format = (post["content_format"] or "").lower()
+    return any(label in normalized_format for label in ["text", "thread", "link", "article"])
+
+
+def _source_link_for_post(post):
+    rss_item_id = _post_value(post, "rss_item_id", "")
+    if rss_item_id:
+        with get_connection() as conn:
+            item = conn.execute(
+                "SELECT title, url, image_url FROM rss_items WHERE id = ?",
+                (rss_item_id,),
+            ).fetchone()
+        if item:
+            return {
+                "title": item["title"],
+                "url": item["url"],
+                "image_url": item["image_url"],
+                "description": post["content"],
+            }
+
+    links = [entity for entity in detect_social_entities(post["content"]) if entity["type"] == "link"]
+    if not links:
+        return None
+    return {
+        "title": post["title"],
+        "url": links[0]["value"],
+        "image_url": "",
+        "description": post["content"],
+    }
+
+
+def _post_value(post, key, fallback=None):
+    if hasattr(post, "keys") and key not in post.keys():
+        return fallback
+    try:
+        return post[key]
+    except (KeyError, TypeError):
+        return fallback
+
+
+def _upload_bluesky_remote_thumb(pds_url, access_jwt, image_url):
+    if not image_url:
+        return None
+    try:
+        with urlopen(image_url, timeout=12) as response:
+            data = response.read(1_000_001)
+            content_type = response.headers.get_content_type() or "image/jpeg"
+    except (HTTPError, URLError, TimeoutError, ValueError):
+        return None
+    if len(data) > 1_000_000 or not content_type.startswith("image/"):
+        return None
+    try:
+        response = _post_bytes(
+            f"{pds_url}/xrpc/com.atproto.repo.uploadBlob",
+            data,
+            content_type,
+            access_jwt,
+            endpoint_name="uploadBlob",
+        )
+    except PublicationError:
+        return None
+    return response.get("blob")
 
 
 def _upload_bluesky_blob(pds_url, access_jwt, path):

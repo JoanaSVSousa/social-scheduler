@@ -35,7 +35,10 @@ from .services.rss_groups import (
     delete_rss_group,
     get_rss_group,
     list_rss_groups,
+    move_rss_group_main_schedule,
+    move_rss_group_recycled_schedule,
     sync_rss_group_platforms,
+    update_rss_group_content_type,
     update_rss_group_posts,
 )
 from .services.schedules import (
@@ -382,14 +385,24 @@ def reschedule_calendar_event():
         schedule = get_schedule(int(schedule_id))
         if schedule is None:
             abort(404)
-        move_schedule_date(int(schedule_id), new_scheduled_at)
-        add_log(schedule["post_id"], "INFO", f"Recycled schedule moved to {new_scheduled_at} from calendar.")
+        post = get_post(schedule["post_id"])
+        if post and post["rss_item_id"]:
+            move_rss_group_recycled_schedule(post["rss_item_id"], _normalize_datetime_value(scheduled_at), new_scheduled_at)
+            add_log(schedule["post_id"], "INFO", f"RSS group recycled schedule moved to {new_scheduled_at} from calendar.")
+        else:
+            move_schedule_date(int(schedule_id), new_scheduled_at)
+            add_log(schedule["post_id"], "INFO", f"Recycled schedule moved to {new_scheduled_at} from calendar.")
     elif event_type == "post":
         if not post_id:
             abort(400)
-        if get_post(int(post_id)) is None:
+        post = get_post(int(post_id))
+        if post is None:
             abort(404)
-        move_post_schedule_date(int(post_id), new_scheduled_at)
+        if post["rss_item_id"]:
+            move_rss_group_main_schedule(post["rss_item_id"], _normalize_datetime_value(scheduled_at), new_scheduled_at)
+            add_log(post["id"], "INFO", f"RSS group main schedule moved to {new_scheduled_at} from calendar.")
+        else:
+            move_post_schedule_date(int(post_id), new_scheduled_at)
     else:
         abort(400)
 
@@ -423,6 +436,11 @@ def edit_rss_article(rss_item_id):
         if not selected_platforms or any(platform not in PLATFORMS for platform in selected_platforms):
             abort(400)
         item, posts = sync_rss_group_platforms(rss_item_id, selected_platforms)
+        content_type = request.form.get("content_type", item["content_type"])
+        if content_type not in {"Regular", "News"}:
+            abort(400)
+        update_rss_group_content_type(rss_item_id, content_type)
+        item, posts = get_rss_group(rss_item_id)
         general_status = request.form.get("general_status", "Draft")
         general_values = {
             "title": request.form.get("general_title", "").strip()[:120],
