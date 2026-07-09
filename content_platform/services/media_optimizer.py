@@ -3,7 +3,9 @@ from pathlib import Path
 from tempfile import gettempdir
 from uuid import uuid4
 
+from ..database import get_connection
 from .media import UPLOAD_DIR
+from .public_media import PublicMediaError, upload_public_media
 
 
 OPTIMIZED_MEDIA_DIR = Path(gettempdir()) / "content_automation_platform_media"
@@ -18,6 +20,8 @@ def prepare_media_for_publish(media_items, image_limit_bytes=DEFAULT_IMAGE_LIMIT
         path = (UPLOAD_DIR / item["filename"]).resolve()
         item["publish_path"] = path
         item["publish_content_type"] = _content_type_for_path(path)
+        if not item.get("public_url"):
+            item["public_url"] = _ensure_public_url(item, path)
 
         if item["media_type"] == "image":
             optimized = optimize_image_file(path, image_limit_bytes=image_limit_bytes)
@@ -27,6 +31,22 @@ def prepare_media_for_publish(media_items, image_limit_bytes=DEFAULT_IMAGE_LIMIT
 
         prepared.append(item)
     return prepared
+
+
+def _ensure_public_url(media_item, path):
+    if not path.exists():
+        return ""
+    try:
+        public_url = upload_public_media(path, f"posts/{media_item['post_id']}/{media_item['filename']}")
+    except (KeyError, PublicMediaError):
+        return ""
+    if public_url:
+        with get_connection() as conn:
+            conn.execute(
+                "UPDATE media_assets SET public_url = ? WHERE id = ?",
+                (public_url, media_item["id"]),
+            )
+    return public_url
 
 
 def optimize_image_file(path, image_limit_bytes=DEFAULT_IMAGE_LIMIT_BYTES):

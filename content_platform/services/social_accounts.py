@@ -65,7 +65,7 @@ SOCIAL_ACCOUNT_SCHEMAS = {
             {"name": "app_id", "label": "Meta App ID", "placeholder": "Optional Meta App ID", "example": "Numeric Meta app id"},
             {"name": "app_secret", "label": "Meta App Secret", "placeholder": "Optional Meta App Secret", "example": "Meta app secret string"},
             {"name": "threads_user_id", "label": "Threads User ID", "placeholder": "Threads user ID", "example": "Numeric Threads user id"},
-            {"name": "access_token", "label": "User Access Token", "placeholder": "Paste Threads access token", "example": "Needs Threads publishing permissions, for example threads_basic and threads_content_publish"},
+            {"name": "access_token", "label": "User Access Token", "placeholder": "Paste a Threads user access token, not the app secret", "example": "Do not paste App Secret here. This must be a generated user token with Threads permissions, for example threads_basic and threads_content_publish."},
         ],
     },
     "Bluesky": {

@@ -416,7 +416,7 @@ def _threads_media_payload(media_items):
         return {"media_type": "TEXT"}
     if not public_media:
         raise PublicationError(
-            "Threads media publishing needs a public image_url/video_url. Upload media after configuring Supabase Storage public media first."
+            "Threads media publishing needs a public image_url/video_url. Check Render env vars SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_MEDIA_BUCKET and confirm the bucket is public, then publish again."
         )
     if public_media["media_type"] == "image":
         return {"media_type": "IMAGE", "image_url": public_media["public_url"]}

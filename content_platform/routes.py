@@ -1,8 +1,12 @@
 from calendar import Calendar, month_name
 from datetime import datetime, timedelta
+import json
+import secrets
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlparse
+from urllib.request import Request, urlopen
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, session, url_for
 
 from .models import (
     FORMAT_MEDIA_GUIDES,
@@ -65,6 +69,7 @@ from .services.social_accounts import (
     credential_field_names,
     credential_summary,
     delete_social_account,
+    decrypt_credentials_for_publisher,
     save_social_account,
     social_accounts_by_platform,
 )
@@ -729,6 +734,104 @@ def save_social_account_settings(platform):
         add_log(None, "INFO", f"Social credentials updated for {platform}.")
         flash(f"{platform} credentials saved securely.", "success")
     return redirect(url_for("main.social_account_settings"))
+
+
+@bp.post("/settings/social-accounts/Threads/connect")
+@login_required
+def connect_threads_account():
+    validate_csrf()
+    account = decrypt_credentials_for_publisher("Threads")
+    credentials = (account or {}).get("credentials", {})
+    app_id = credentials.get("app_id")
+    app_secret = credentials.get("app_secret")
+    if not app_id or not app_secret:
+        flash("Save Threads Meta App ID and Meta App Secret before connecting Threads.", "warning")
+        return redirect(url_for("main.social_account_settings"))
+
+    state = secrets.token_urlsafe(24)
+    session["threads_oauth_state"] = state
+    redirect_uri = url_for("main.threads_oauth_callback", _external=True)
+    authorization_url = "https://threads.net/oauth/authorize?" + urlencode(
+        {
+            "client_id": app_id,
+            "redirect_uri": redirect_uri,
+            "scope": "threads_basic,threads_content_publish",
+            "response_type": "code",
+            "state": state,
+        }
+    )
+    return redirect(authorization_url)
+
+
+@bp.get("/settings/social-accounts/Threads/callback")
+@login_required
+def threads_oauth_callback():
+    if request.args.get("state") != session.pop("threads_oauth_state", ""):
+        flash("Threads authorization state did not match. Please try connecting again.", "warning")
+        return redirect(url_for("main.social_account_settings"))
+
+    code = request.args.get("code", "").strip()
+    if not code:
+        flash(request.args.get("error_description") or "Threads did not return an authorization code.", "warning")
+        return redirect(url_for("main.social_account_settings"))
+
+    account = decrypt_credentials_for_publisher("Threads")
+    credentials = (account or {}).get("credentials", {})
+    app_id = credentials.get("app_id")
+    app_secret = credentials.get("app_secret")
+    if not account or not app_id or not app_secret:
+        flash("Threads App ID/App Secret are missing. Save them and connect again.", "warning")
+        return redirect(url_for("main.social_account_settings"))
+
+    redirect_uri = url_for("main.threads_oauth_callback", _external=True)
+    try:
+        token_payload = _exchange_threads_authorization_code(app_id, app_secret, code, redirect_uri)
+    except RuntimeError as exc:
+        flash(str(exc), "warning")
+        return redirect(url_for("main.social_account_settings"))
+
+    access_token = token_payload.get("access_token")
+    user_id = str(token_payload.get("user_id") or "")
+    if not access_token or not user_id:
+        flash("Threads authorization did not return both access_token and user_id.", "warning")
+        return redirect(url_for("main.social_account_settings"))
+
+    save_social_account(
+        "Threads",
+        account.get("account_label", ""),
+        account.get("account_handle", ""),
+        account.get("auth_type", "threads_api") or "threads_api",
+        {"threads_user_id": user_id, "access_token": access_token},
+    )
+    add_log(None, "INFO", "Threads OAuth connected and credentials updated.")
+    flash("Threads connected. User ID and access token saved.", "success")
+    return redirect(url_for("main.social_account_settings"))
+
+
+def _exchange_threads_authorization_code(app_id, app_secret, code, redirect_uri):
+    data = urlencode(
+        {
+            "client_id": app_id,
+            "client_secret": app_secret,
+            "grant_type": "authorization_code",
+            "redirect_uri": redirect_uri,
+            "code": code,
+        }
+    ).encode("utf-8")
+    request = Request(
+        "https://graph.threads.net/oauth/access_token",
+        data=data,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=20) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Threads token exchange failed {exc.code}: {detail[:400]}") from exc
+    except (URLError, TimeoutError, ValueError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"Threads token exchange failed: {exc}") from exc
 
 
 @bp.post("/settings/social-accounts/<platform>/delete")
