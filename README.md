@@ -137,7 +137,17 @@ In `Posts`, RSS articles are grouped into one row. Use `Edit versions` to adapt 
 - upload images or videos per network version;
 - use the source article image preview as a reference for media selection.
 
-Current production note: uploaded media is stored in `static/uploads`. For serious team usage on Render, move this to persistent object storage such as Supabase Storage or S3.
+In production, uploaded media is stored locally and, when Supabase Storage is configured, also uploaded to a public bucket. The public URL is required for Meta publishers such as Threads, Instagram, and Facebook when publishing images, videos, reels, and stories.
+
+Render environment variables for public media storage:
+
+```bash
+export SUPABASE_URL="https://your-project.supabase.co"
+export SUPABASE_SERVICE_ROLE_KEY="server-only-service-role-key"
+export SUPABASE_MEDIA_BUCKET="social-media"
+```
+
+The bucket must be public, or at least expose public read URLs for the uploaded objects. Do not commit the service role key to GitHub and do not expose it in frontend code.
 
 ## Email Dashboard Report
 

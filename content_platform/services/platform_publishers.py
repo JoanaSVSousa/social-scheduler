@@ -71,20 +71,16 @@ def publish_to_threads(post, media_items):
     access_token = credentials.get("access_token")
     if not threads_user_id or not access_token:
         raise PublicationError("Threads needs a Threads User ID and a user access token with publishing permissions.")
-    if media_items:
-        raise PublicationError(
-            "Threads media publishing needs a public image_url/video_url. Local uploaded media is not public yet; publish a text/link post or add public media storage first."
-        )
-
     text = compose_publication_text("Threads", post["content"], post["hashtags"])
     if not text:
         raise PublicationError("Post content is empty. The title is internal and is not published.")
     if len(text) > 500:
         raise PublicationError("Threads posts must be 500 characters or less. Shorten this version before publishing.")
 
+    media_payload = _threads_media_payload(media_items)
     container = _post_form(
         f"https://graph.threads.net/v1.0/{threads_user_id}/threads",
-        {"media_type": "TEXT", "text": text, "access_token": access_token},
+        {"text": text, "access_token": access_token, **media_payload},
         endpoint_name="Threads create container",
         error_label="Threads API",
     )
@@ -112,25 +108,38 @@ def publish_to_facebook(post, media_items):
     access_token = credentials.get("access_token")
     if not page_id or not access_token:
         raise PublicationError("Facebook needs a Page ID and a Page access token with publishing permissions.")
-    if media_items:
-        raise PublicationError(
-            "Facebook media publishing from local uploads needs public media hosting or multipart upload support. Publish link/text first or add public media storage first."
-        )
-
     text = compose_publication_text("Facebook", post["content"], post["hashtags"])
     if not text:
         raise PublicationError("Post content is empty. The title is internal and is not published.")
 
-    payload = {"message": text, "access_token": access_token}
-    source = _source_link_for_post(post)
-    if source and source.get("url"):
-        payload["link"] = source["url"]
-    response = _post_form(
-        f"https://graph.facebook.com/v20.0/{page_id}/feed",
-        payload,
-        endpoint_name="Facebook Page feed publish",
-        error_label="Facebook API",
-    )
+    public_media = _first_public_media(media_items)
+    if media_items and not public_media:
+        raise PublicationError("Facebook media publishing needs a public image/video URL. Configure Supabase Storage public media first.")
+    if public_media and public_media["media_type"] == "image":
+        response = _post_form(
+            f"https://graph.facebook.com/v20.0/{page_id}/photos",
+            {"url": public_media["public_url"], "caption": text, "access_token": access_token},
+            endpoint_name="Facebook Page photo publish",
+            error_label="Facebook API",
+        )
+    elif public_media and public_media["media_type"] == "video":
+        response = _post_form(
+            f"https://graph.facebook.com/v20.0/{page_id}/videos",
+            {"file_url": public_media["public_url"], "description": text, "access_token": access_token},
+            endpoint_name="Facebook Page video publish",
+            error_label="Facebook API",
+        )
+    else:
+        payload = {"message": text, "access_token": access_token}
+        source = _source_link_for_post(post)
+        if source and source.get("url"):
+            payload["link"] = source["url"]
+        response = _post_form(
+            f"https://graph.facebook.com/v20.0/{page_id}/feed",
+            payload,
+            endpoint_name="Facebook Page feed publish",
+            error_label="Facebook API",
+        )
     post_id = response.get("id")
     return f"https://facebook.com/{post_id}" if post_id else "Facebook Page post created."
 
@@ -147,25 +156,39 @@ def publish_to_instagram(post, media_items):
         raise PublicationError("Instagram needs an Instagram Business ID and a Meta access token with content publishing permissions.")
 
     normalized_format = (post["content_format"] or "").lower()
-    if any(label in normalized_format for label in ["story", "reel", "video"]):
-        raise PublicationError("Instagram Reels, Stories, and video publishing need public video URLs. This MVP currently supports feed image publishing from public RSS/article images.")
-    if media_items:
-        raise PublicationError(
-            "Instagram Graph publishing needs a public image_url/video_url. Local uploaded media is not public yet; add public media storage before publishing uploaded files."
-        )
-
+    public_media = _first_public_media(media_items)
+    if media_items and not public_media:
+        raise PublicationError("Instagram publishing needs a public image/video URL for uploaded media. Configure Supabase Storage public media first.")
     source = _source_link_for_post(post)
-    image_url = (source or {}).get("image_url")
-    if not image_url:
-        raise PublicationError("Instagram feed publishing needs a public image URL. RSS/article image was not found for this post.")
-
     caption = compose_publication_text("Instagram", post["content"], post["hashtags"])
     if not caption:
         raise PublicationError("Post content is empty. The title is internal and is not published.")
 
+    payload = {"caption": caption, "access_token": access_token}
+    if any(label in normalized_format for label in ["reel", "video"]):
+        if not public_media or public_media["media_type"] != "video":
+            raise PublicationError("Instagram Reels/video publishing needs a public video URL from an uploaded video.")
+        payload.update({"media_type": "REELS", "video_url": public_media["public_url"]})
+    elif "story" in normalized_format:
+        if not public_media:
+            raise PublicationError("Instagram Story publishing needs a public image or video URL from uploaded media.")
+        if public_media["media_type"] == "video":
+            payload.update({"media_type": "STORIES", "video_url": public_media["public_url"]})
+        else:
+            payload.update({"media_type": "STORIES", "image_url": public_media["public_url"]})
+    elif public_media:
+        if public_media["media_type"] != "image":
+            raise PublicationError("Instagram feed image publishing needs a public image URL. Choose Reel/Video for video media.")
+        payload["image_url"] = public_media["public_url"]
+    else:
+        image_url = (source or {}).get("image_url")
+        if not image_url:
+            raise PublicationError("Instagram feed publishing needs a public image URL. Upload media or use an RSS/article image.")
+        payload["image_url"] = image_url
+
     container = _post_form(
         f"https://graph.facebook.com/v20.0/{instagram_id}/media",
-        {"image_url": image_url, "caption": caption, "access_token": access_token},
+        payload,
         endpoint_name="Instagram create media container",
         error_label="Instagram API",
     )
@@ -376,6 +399,30 @@ def _linkedin_author_urn(value):
     if value.isdigit():
         return f"urn:li:organization:{value}"
     return value
+
+
+def _first_public_media(media_items, media_type=None):
+    for item in media_items:
+        public_url = item.get("public_url") if hasattr(item, "get") else ""
+        item_type = item.get("media_type") if hasattr(item, "get") else ""
+        if public_url and (media_type is None or item_type == media_type):
+            return {"public_url": public_url, "media_type": item_type}
+    return None
+
+
+def _threads_media_payload(media_items):
+    public_media = _first_public_media(media_items)
+    if not media_items:
+        return {"media_type": "TEXT"}
+    if not public_media:
+        raise PublicationError(
+            "Threads media publishing needs a public image_url/video_url. Upload media after configuring Supabase Storage public media first."
+        )
+    if public_media["media_type"] == "image":
+        return {"media_type": "IMAGE", "image_url": public_media["public_url"]}
+    if public_media["media_type"] == "video":
+        return {"media_type": "VIDEO", "video_url": public_media["public_url"]}
+    raise PublicationError("Threads supports image or video media for this publisher.")
 
 
 def _compose_bluesky_text(post):

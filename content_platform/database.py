@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS media_assets (
     filename TEXT NOT NULL,
     original_filename TEXT NOT NULL,
     media_type TEXT NOT NULL,
+    public_url TEXT DEFAULT '',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE
 );
@@ -128,6 +129,7 @@ CREATE TABLE IF NOT EXISTS media_assets (
     filename TEXT NOT NULL,
     original_filename TEXT NOT NULL,
     media_type TEXT NOT NULL,
+    public_url TEXT DEFAULT '',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE
 );
@@ -238,6 +240,7 @@ def init_db(db_path=None):
         _ensure_column(conn, "posts", "content_format", "TEXT NOT NULL DEFAULT 'Feed Post'")
         _ensure_column(conn, "posts", "rss_item_id", "INTEGER")
         _ensure_column(conn, "posts", "source_type", "TEXT NOT NULL DEFAULT 'Regular'")
+        _ensure_column(conn, "media_assets", "public_url", "TEXT DEFAULT ''")
         _ensure_column(conn, "rss_feeds", "content_type", "TEXT NOT NULL DEFAULT 'Regular'")
         _ensure_column(conn, "rss_feeds", "last_check_status", "TEXT NOT NULL DEFAULT 'Never checked'")
         _ensure_column(conn, "rss_feeds", "last_check_message", "TEXT DEFAULT ''")

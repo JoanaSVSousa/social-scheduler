@@ -5,6 +5,7 @@ from werkzeug.utils import secure_filename
 
 from ..database import PROJECT_ROOT, get_connection
 from ..models import FORMAT_MEDIA_RULES
+from .public_media import PublicMediaError, upload_public_media
 
 
 UPLOAD_DIR = PROJECT_ROOT / "static" / "uploads"
@@ -40,16 +41,23 @@ def save_media_files(post_id, files, content_format=""):
             continue
 
         path = UPLOAD_DIR / filename
+        public_url = ""
         try:
             file.save(path)
+            public_url = upload_public_media(path, f"posts/{post_id}/{filename}")
             with get_connection() as conn:
                 conn.execute(
                     """
-                    INSERT INTO media_assets (post_id, filename, original_filename, media_type)
-                    VALUES (?, ?, ?, ?)
+                    INSERT INTO media_assets (post_id, filename, original_filename, media_type, public_url)
+                    VALUES (?, ?, ?, ?, ?)
                     """,
-                    (post_id, filename, original_filename, media_type),
+                    (post_id, filename, original_filename, media_type, public_url),
                 )
+        except PublicMediaError as exc:
+            if path.exists():
+                path.unlink()
+            skipped.append(f"{original_filename} ({exc})")
+            continue
         except Exception:
             if path.exists():
                 path.unlink()

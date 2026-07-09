@@ -99,7 +99,7 @@ def clone_post_to_platforms(post_id, platforms):
     created = []
     with get_connection() as conn:
         media_rows = conn.execute(
-            "SELECT filename, original_filename, media_type FROM media_assets WHERE post_id = ? ORDER BY id ASC",
+            "SELECT filename, original_filename, media_type, public_url FROM media_assets WHERE post_id = ? ORDER BY id ASC",
             (post_id,),
         ).fetchall()
         schedule_rows = conn.execute(
@@ -147,10 +147,16 @@ def clone_post_to_platforms(post_id, platforms):
             for media in media_rows:
                 conn.execute(
                     """
-                    INSERT INTO media_assets (post_id, filename, original_filename, media_type)
-                    VALUES (?, ?, ?, ?)
+                    INSERT INTO media_assets (post_id, filename, original_filename, media_type, public_url)
+                    VALUES (?, ?, ?, ?, ?)
                     """,
-                    (cloned_post_id, media["filename"], media["original_filename"], media["media_type"]),
+                    (
+                        cloned_post_id,
+                        media["filename"],
+                        media["original_filename"],
+                        media["media_type"],
+                        media["public_url"],
+                    ),
                 )
             for schedule in schedule_rows:
                 conn.execute(
