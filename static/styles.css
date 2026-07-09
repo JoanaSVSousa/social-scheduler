@@ -673,6 +673,10 @@ label {
     font-weight: 800;
 }
 
+[hidden] {
+    display: none !important;
+}
+
 .field-help {
     color: var(--muted);
     font-size: 0.86rem;

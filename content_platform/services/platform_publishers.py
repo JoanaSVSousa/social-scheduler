@@ -97,11 +97,16 @@ def publish_to_x(post, media_items):
         raise PublicationError("X credentials are not configured.")
 
     credentials = account["credentials"]
-    oauth_header = _x_oauth1_header("POST", "https://api.x.com/2/tweets", credentials)
-    access_token = credentials.get("oauth2_user_token") or credentials.get("bearer_token")
-    if not oauth_header and not access_token:
+    auth_type = account.get("auth_type") or "oauth1"
+    oauth_header = _x_oauth1_header("POST", "https://api.x.com/2/tweets", credentials) if auth_type == "oauth1" else ""
+    access_token = (credentials.get("oauth2_user_token") or credentials.get("bearer_token")) if auth_type == "oauth2" else ""
+    if auth_type == "oauth2" and not access_token:
         raise PublicationError(
-            "X needs either OAuth 1.0a user credentials or an OAuth2 User Access Token with tweet.write permission."
+            "X OAuth2 needs a User Access Token with tweet.write. Client ID and Client Secret alone cannot publish."
+        )
+    if auth_type == "oauth1" and not oauth_header:
+        raise PublicationError(
+            "X OAuth1 needs API Key, API Key Secret, Access Token, and Access Token Secret."
         )
 
     text = compose_publication_text("X", post["content"], post["hashtags"])

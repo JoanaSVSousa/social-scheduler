@@ -55,7 +55,7 @@
                 <p class="field-help">{{ schema.description }}</p>
                 <div class="credential-grid">
                     {% for field in schema.fields %}
-                    <label data-auth-field data-auth-types="{{ field.auth_types|default([])|join(',') }}">
+                    <label data-auth-field data-auth-types="{{ field.get('auth_types', [])|join(',') }}">
                         {{ field.label }}
                         <input
                             type="password"
@@ -71,7 +71,7 @@
                 </div>
                 <div class="credential-summary">
                     {% for field in schema.fields %}
-                    <span class="credential-pill {% if summary.get(field.name) %}saved{% endif %}" data-auth-field data-auth-types="{{ field.auth_types|default([])|join(',') }}">
+                    <span class="credential-pill {% if summary.get(field.name) %}saved{% endif %}" data-auth-field data-auth-types="{{ field.get('auth_types', [])|join(',') }}">
                         {{ field.label }}: {% if summary.get(field.name) %}saved{% else %}empty{% endif %}
                     </span>
                     {% endfor %}
