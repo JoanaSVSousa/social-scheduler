@@ -1,4 +1,5 @@
 from .media import get_media_for_post
+from .media_optimizer import prepare_media_for_publish
 from .platform_publishers import is_platform_publishable, publish_to_platform
 from .scheduler import add_log, get_due_posts, get_post, mark_post_status
 from .schedules import get_due_schedules, mark_schedule_status
@@ -75,7 +76,7 @@ def publish_rss_group_now(posts):
 
 
 def _publish_post(post, reason):
-    media_items = get_media_for_post(post["id"])
+    media_items = prepare_media_for_publish(get_media_for_post(post["id"]))
     uri = publish_to_platform(post, media_items)
     mark_post_status(post["id"], "Published")
     add_log(

@@ -2,13 +2,16 @@ from datetime import datetime, timezone
 from html import unescape
 import json
 import mimetypes
+from pathlib import Path
 import re
+from tempfile import gettempdir
 from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
 
 from ..database import get_connection
 from .media import UPLOAD_DIR
+from .media_optimizer import DEFAULT_IMAGE_LIMIT_BYTES, optimize_image_bytes
 from .rich_text import compose_publication_text, detect_social_entities, utf8_byte_range
 from .social_accounts import decrypt_credentials_for_publisher
 
@@ -17,7 +20,7 @@ class PublicationError(Exception):
     pass
 
 
-IMPLEMENTED_PUBLISHERS = {"Bluesky"}
+IMPLEMENTED_PUBLISHERS = {"Bluesky", "X"}
 
 
 def is_platform_publishable(platform):
@@ -27,6 +30,8 @@ def is_platform_publishable(platform):
 def publish_to_platform(post, media_items):
     if post["platform"] == "Bluesky":
         return publish_to_bluesky(post, media_items)
+    if post["platform"] == "X":
+        return publish_to_x(post, media_items)
     raise PublicationError(f"Real API publishing is not implemented yet for {post['platform']}.")
 
 
@@ -81,6 +86,34 @@ def publish_to_bluesky(post, media_items):
     return response.get("uri") or "Bluesky post created"
 
 
+def publish_to_x(post, media_items):
+    account = decrypt_credentials_for_publisher("X")
+    if not account:
+        raise PublicationError("X credentials are not configured.")
+
+    credentials = account["credentials"]
+    access_token = credentials.get("oauth2_user_token") or credentials.get("bearer_token") or credentials.get("access_token")
+    if not access_token:
+        raise PublicationError("X needs an OAuth2 User Access Token with tweet.write permission.")
+
+    text = compose_publication_text("X", post["content"], post["hashtags"])
+    if not text:
+        raise PublicationError("Post content is empty. The title is internal and is not published.")
+    if len(text) > 280:
+        raise PublicationError("X posts must be 280 characters or less. Shorten this version before publishing.")
+
+    response = _post_json(
+        "https://api.x.com/2/tweets",
+        {"text": text},
+        access_jwt=access_token,
+        endpoint_name="X create post",
+        error_label="X API",
+    )
+    post_id = (response.get("data") or {}).get("id")
+    suffix = " Media upload for X is not implemented yet." if media_items else ""
+    return f"https://x.com/i/web/status/{post_id}{suffix}" if post_id else f"X post created.{suffix}"
+
+
 def _compose_bluesky_text(post):
     text = compose_publication_text("Bluesky", post["content"], post["hashtags"])
     if not text:
@@ -119,9 +152,10 @@ def _build_bluesky_image_embed(pds_url, access_jwt, media_items):
     for media_item in media_items[:4]:
         if media_item["media_type"] != "image":
             raise PublicationError("Bluesky publisher currently supports image media only. Remove video media for this test.")
-        path = (UPLOAD_DIR / media_item["filename"]).resolve()
+        path = _publish_path_for_media(media_item)
         if not path.exists() or UPLOAD_DIR.resolve() not in path.parents:
-            raise PublicationError(f"Media file is missing: {media_item['original_filename']}")
+            if not _is_optimized_publish_path(path):
+                raise PublicationError(f"Media file is missing: {media_item['original_filename']}")
         blob = _upload_bluesky_blob(pds_url, access_jwt, path)
         images.append({"alt": media_item["original_filename"], "image": blob})
 
@@ -243,11 +277,16 @@ def _upload_bluesky_remote_thumb(pds_url, access_jwt, image_url):
         return None
     try:
         with urlopen(image_url, timeout=12) as response:
-            data = response.read(1_000_001)
+            data = response.read(8_000_001)
             content_type = response.headers.get_content_type() or "image/jpeg"
     except (HTTPError, URLError, TimeoutError, ValueError):
         return None
-    if len(data) > 1_000_000 or not content_type.startswith("image/"):
+    if not content_type.startswith("image/"):
+        return None
+    if len(data) > DEFAULT_IMAGE_LIMIT_BYTES:
+        data = optimize_image_bytes(data, image_limit_bytes=DEFAULT_IMAGE_LIMIT_BYTES)
+        content_type = "image/jpeg"
+    if not data or len(data) > DEFAULT_IMAGE_LIMIT_BYTES:
         return None
     try:
         response = _post_bytes(
@@ -279,6 +318,21 @@ def _upload_bluesky_blob(pds_url, access_jwt, path):
     return blob
 
 
+def _publish_path_for_media(media_item):
+    value = media_item.get("publish_path") if hasattr(media_item, "get") else None
+    if value:
+        return Path(value).resolve()
+    return (UPLOAD_DIR / media_item["filename"]).resolve()
+
+
+def _is_optimized_publish_path(path):
+    try:
+        return Path(path).resolve().is_relative_to(Path(gettempdir()).resolve())
+    except AttributeError:
+        resolved = str(Path(path).resolve())
+        return resolved.startswith(str(Path(gettempdir()).resolve()))
+
+
 def _normalize_bluesky_pds_url(value):
     value = (value or "").strip()
     if not value:
@@ -297,30 +351,30 @@ def _normalize_bluesky_pds_url(value):
     return f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
 
 
-def _post_json(url, payload, access_jwt=None, endpoint_name="request"):
+def _post_json(url, payload, access_jwt=None, endpoint_name="request", error_label="Bluesky API"):
     data = json.dumps(payload).encode("utf-8")
     headers = {"Content-Type": "application/json"}
     if access_jwt:
         headers["Authorization"] = f"Bearer {access_jwt}"
-    return _request_json(Request(url, data=data, headers=headers, method="POST"), endpoint_name)
+    return _request_json(Request(url, data=data, headers=headers, method="POST"), endpoint_name, error_label)
 
 
-def _post_bytes(url, payload, content_type, access_jwt, endpoint_name="request"):
+def _post_bytes(url, payload, content_type, access_jwt, endpoint_name="request", error_label="Bluesky API"):
     headers = {"Content-Type": content_type, "Authorization": f"Bearer {access_jwt}"}
-    return _request_json(Request(url, data=payload, headers=headers, method="POST"), endpoint_name)
+    return _request_json(Request(url, data=payload, headers=headers, method="POST"), endpoint_name, error_label)
 
 
-def _request_json(request, endpoint_name):
+def _request_json(request, endpoint_name, error_label):
     try:
         with urlopen(request, timeout=20) as response:
             return json.loads(response.read().decode("utf-8"))
     except HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
-        raise PublicationError(f"Bluesky API {endpoint_name} error {exc.code}: {_clean_error_detail(detail)}") from exc
+        raise PublicationError(f"{error_label} {endpoint_name} error {exc.code}: {_clean_error_detail(detail)}") from exc
     except (URLError, TimeoutError) as exc:
-        raise PublicationError(f"Bluesky API {endpoint_name} request failed: {exc}") from exc
+        raise PublicationError(f"{error_label} {endpoint_name} request failed: {exc}") from exc
     except json.JSONDecodeError as exc:
-        raise PublicationError(f"Bluesky API {endpoint_name} returned an invalid JSON response.") from exc
+        raise PublicationError(f"{error_label} {endpoint_name} returned an invalid JSON response.") from exc
 
 
 def _clean_error_detail(detail):

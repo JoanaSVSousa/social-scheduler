@@ -43,14 +43,15 @@ SOCIAL_ACCOUNT_SCHEMAS = {
         ],
     },
     "X": {
-        "description": "X can require OAuth 1.0a user tokens for posting, plus bearer/API keys depending on the endpoint.",
+        "description": "X posting uses an OAuth 2.0 User Access Token for /2/tweets. API key/secret are stored for the app context; the user access token is what publishes.",
         "auth_options": [("oauth1", "OAuth 1.0a user tokens"), ("oauth2", "OAuth 2.0")],
         "fields": [
             {"name": "api_key", "label": "API Key", "placeholder": "Consumer/API key", "example": "From X Developer Portal"},
             {"name": "api_secret", "label": "API Secret", "placeholder": "Consumer/API secret", "example": "Also called API Key Secret"},
-            {"name": "access_token", "label": "Access Token", "placeholder": "User access token", "example": "OAuth 1.0a user token"},
+            {"name": "oauth2_user_token", "label": "OAuth2 User Access Token", "placeholder": "Paste OAuth2 user access token", "example": "Bearer user token with tweet.write scope"},
+            {"name": "access_token", "label": "OAuth1 Access Token", "placeholder": "Optional OAuth1 user token", "example": "OAuth 1.0a user token, kept for later media/upload support"},
             {"name": "access_token_secret", "label": "Access Token Secret", "placeholder": "User access token secret", "example": "OAuth 1.0a user token secret"},
-            {"name": "bearer_token", "label": "Bearer Token", "placeholder": "Optional bearer token", "example": "Usually starts with AAAAA..."},
+            {"name": "bearer_token", "label": "Fallback Bearer Token", "placeholder": "Optional bearer/user token", "example": "Use only if it is a user token with write permissions"},
         ],
     },
     "Threads": {
