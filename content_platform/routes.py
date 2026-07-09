@@ -1,6 +1,6 @@
 from calendar import Calendar, month_name
 from datetime import datetime, timedelta
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 
@@ -22,6 +22,7 @@ from .auth import is_logged_in, login_required, verify_admin_credentials
 from .services.analytics import build_platform_counts, build_status_counts
 from .services.media import delete_media, get_media_for_post, get_media_for_posts, save_media_files
 from .services.publisher import process_publication_queue, publish_post_now, publish_rss_group_now
+from .services.rich_text import compose_publication_text
 from .services.rss import (
     check_all_feeds,
     create_feed,
@@ -157,6 +158,7 @@ def _aggregate_posts_for_library(posts, media_by_post, schedules_by_post):
         if not post_data.get("rss_item_id"):
             post_data["is_rss_group"] = False
             post_data["sort_scheduled_at"] = _earliest_schedule_value(post_data, schedules_by_post.get(post_data["id"], []))
+            post_data["x_manual_url"] = _x_manual_composer_url(post_data)
             rows.append(post_data)
             continue
 
@@ -180,6 +182,7 @@ def _aggregate_posts_for_library(posts, media_by_post, schedules_by_post):
                 "statuses": [],
                 "media_total": 0,
                 "schedule_total": 0,
+                "x_manual_url": "",
             },
         )
         group["platforms"].append(post_data["platform"])
@@ -192,6 +195,8 @@ def _aggregate_posts_for_library(posts, media_by_post, schedules_by_post):
             group["scheduled_at"] = post_schedule
         if post_data["created_at"] and post_data["created_at"] < group["created_at"]:
             group["created_at"] = post_data["created_at"]
+        if post_data["platform"] == "X":
+            group["x_manual_url"] = _x_manual_composer_url(post_data)
 
     for group in rss_groups.values():
         group["platform"] = ", ".join(sorted(set(group["platforms"])))
@@ -200,6 +205,15 @@ def _aggregate_posts_for_library(posts, media_by_post, schedules_by_post):
         rows.append(group)
 
     return rows
+
+
+def _x_manual_composer_url(post):
+    if post.get("platform") != "X":
+        return ""
+    text = compose_publication_text("X", post.get("content", ""), post.get("hashtags", ""))
+    if not text:
+        return ""
+    return "https://twitter.com/intent/tweet?" + urlencode({"text": text})
 
 
 def _earliest_schedule_value(post, schedules):
