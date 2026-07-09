@@ -43,17 +43,19 @@ SOCIAL_ACCOUNT_SCHEMAS = {
         ],
     },
     "X": {
-        "description": "OAuth2 Client ID/Client Secret identify the app, but they do not publish by themselves. X publishing needs a User Access Token with tweet.write.",
+        "description": (
+            "X needs two things: app permissions set to Read and Write, and an X API product/access level that allows POST /2/tweets. "
+            "OAuth2 Client ID/Client Secret identify the app, but they do not publish by themselves."
+        ),
         "auth_options": [("oauth1", "OAuth 1.0a user tokens"), ("oauth2", "OAuth 2.0")],
         "fields": [
-            {"name": "api_key", "label": "API Key / Consumer Key", "placeholder": "OAuth1 API Key, not Client ID", "example": "Required for OAuth1. X Developer Portal > Keys and tokens > Consumer Keys > API Key.", "auth_types": ["oauth1"]},
-            {"name": "api_secret", "label": "API Key Secret", "placeholder": "OAuth1 API Key Secret, not Client Secret", "example": "Required for OAuth1. X Developer Portal > Keys and tokens > Consumer Keys > API Key Secret.", "auth_types": ["oauth1"]},
-            {"name": "access_token", "label": "OAuth1 Access Token", "placeholder": "OAuth1 user access token", "example": "Required for OAuth1. X Developer Portal > Authentication Tokens > Access Token.", "auth_types": ["oauth1"]},
-            {"name": "access_token_secret", "label": "Access Token Secret", "placeholder": "OAuth1 user access token secret", "example": "Required for OAuth1. X Developer Portal > Authentication Tokens > Access Token Secret.", "auth_types": ["oauth1"]},
-            {"name": "oauth2_client_id", "label": "OAuth2 Client ID", "placeholder": "OAuth2 Client ID", "example": "Identifies the app. This is not enough to publish by itself.", "auth_types": ["oauth2"]},
-            {"name": "oauth2_client_secret", "label": "OAuth2 Client Secret", "placeholder": "OAuth2 Client Secret", "example": "App secret. This is not enough to publish by itself.", "auth_types": ["oauth2"]},
-            {"name": "oauth2_user_token", "label": "OAuth2 User Access Token", "placeholder": "OAuth2 user-context token", "example": "Required for OAuth2 publishing. Must include tweet.write and be user-context.", "auth_types": ["oauth2"]},
-            {"name": "bearer_token", "label": "Fallback Bearer Token", "placeholder": "Optional OAuth2 user bearer token", "example": "Do not use the app-only Bearer Token here; it cannot create posts.", "auth_types": ["oauth2"]},
+            {"name": "api_key", "label": "API Key / Consumer Key", "placeholder": "OAuth1 API Key, not Client ID", "example": "OAuth1 only. X Developer Portal > Keys and tokens > Consumer Keys > API Key.", "auth_types": ["oauth1"]},
+            {"name": "api_secret", "label": "API Key Secret", "placeholder": "OAuth1 API Key Secret, not Client Secret", "example": "OAuth1 only. X Developer Portal > Keys and tokens > Consumer Keys > API Key Secret.", "auth_types": ["oauth1"]},
+            {"name": "access_token", "label": "OAuth1 Access Token", "placeholder": "OAuth1 user access token", "example": "OAuth1 only. Regenerate after setting app permissions to Read and Write.", "auth_types": ["oauth1"]},
+            {"name": "access_token_secret", "label": "Access Token Secret", "placeholder": "OAuth1 user access token secret", "example": "OAuth1 only. Pair generated with the OAuth1 Access Token.", "auth_types": ["oauth1"]},
+            {"name": "oauth2_client_id", "label": "OAuth2 Client ID", "placeholder": "OAuth2 Client ID", "example": "OAuth2 app identifier. It cannot publish without a user token.", "auth_types": ["oauth2"]},
+            {"name": "oauth2_client_secret", "label": "OAuth2 Client Secret", "placeholder": "OAuth2 Client Secret", "example": "OAuth2 app secret. Keep it private; it is not the posting token.", "auth_types": ["oauth2"]},
+            {"name": "oauth2_user_token", "label": "OAuth2 User Access Token", "placeholder": "OAuth2 user-context token", "example": "Required for OAuth2 publishing. Must be user-context with tweet.write, not app-only Bearer.", "auth_types": ["oauth2"]},
         ],
     },
     "Threads": {

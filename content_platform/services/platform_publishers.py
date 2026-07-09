@@ -99,10 +99,10 @@ def publish_to_x(post, media_items):
     credentials = account["credentials"]
     auth_type = account.get("auth_type") or "oauth1"
     oauth_header = _x_oauth1_header("POST", "https://api.x.com/2/tweets", credentials) if auth_type == "oauth1" else ""
-    access_token = (credentials.get("oauth2_user_token") or credentials.get("bearer_token")) if auth_type == "oauth2" else ""
+    access_token = credentials.get("oauth2_user_token") if auth_type == "oauth2" else ""
     if auth_type == "oauth2" and not access_token:
         raise PublicationError(
-            "X OAuth2 needs a User Access Token with tweet.write. Client ID and Client Secret alone cannot publish."
+            "X OAuth2 needs a User Access Token with tweet.write. Client ID, Client Secret, and app-only Bearer Token cannot publish."
         )
     if auth_type == "oauth1" and not oauth_header:
         raise PublicationError(
@@ -449,5 +449,7 @@ def _x_auth_help():
     return (
         "Check X credentials: OAuth1 uses API Key/API Key Secret, not OAuth2 Client ID/Client Secret; "
         "the app must have Read and Write permissions; regenerate the user Access Token and Access Token Secret "
-        "after changing permissions. OAuth2 must be User Context with tweet.write, not application-only bearer."
+        "after changing permissions. OAuth2 must be User Context with tweet.write, not application-only bearer. "
+        "If X says client-not-enrolled or Appropriate Level of API Access, the app credentials may be valid but the "
+        "Project/API product is not enrolled in an access level that allows POST /2/tweets."
     )
