@@ -795,7 +795,7 @@ def connect_facebook_account():
     state = secrets.token_urlsafe(24)
     session["meta_oauth_state"] = state
     session["meta_oauth_platform"] = "Facebook"
-    redirect_uri = url_for("main.meta_oauth_callback", _external=True)
+    redirect_uri = _external_oauth_url("main.meta_oauth_callback")
     authorization_url = "https://www.facebook.com/v20.0/dialog/oauth?" + urlencode(
         {
             "client_id": app_id,
@@ -821,7 +821,7 @@ def meta_oauth_callback():
         flash(request.args.get("error_description") or "Meta did not return an authorization code.", "warning")
         return redirect(url_for("main.social_account_settings"))
 
-    redirect_uri = url_for("main.meta_oauth_callback", _external=True)
+    redirect_uri = _external_oauth_url("main.meta_oauth_callback")
     if platform == "Facebook":
         return _complete_facebook_oauth_connection(code, redirect_uri)
     if platform == "Instagram":
@@ -843,7 +843,7 @@ def facebook_oauth_callback():
         flash(request.args.get("error_description") or "Facebook did not return an authorization code.", "warning")
         return redirect(url_for("main.social_account_settings"))
 
-    redirect_uri = url_for("main.facebook_oauth_callback", _external=True)
+    redirect_uri = _external_oauth_url("main.facebook_oauth_callback")
     return _complete_facebook_oauth_connection(code, redirect_uri)
 
 
@@ -947,7 +947,7 @@ def connect_instagram_account():
     state = secrets.token_urlsafe(24)
     session["meta_oauth_state"] = state
     session["meta_oauth_platform"] = "Instagram"
-    redirect_uri = url_for("main.meta_oauth_callback", _external=True)
+    redirect_uri = _external_oauth_url("main.meta_oauth_callback")
     authorization_url = "https://www.facebook.com/v20.0/dialog/oauth?" + urlencode(
         {
             "client_id": app_id,
@@ -955,6 +955,8 @@ def connect_instagram_account():
             "scope": "pages_show_list,pages_read_engagement,instagram_basic,instagram_content_publish",
             "response_type": "code",
             "state": state,
+            "auth_type": "rerequest",
+            "return_scopes": "true",
         }
     )
     return redirect(authorization_url)
@@ -972,7 +974,7 @@ def instagram_oauth_callback():
         flash(request.args.get("error_description") or "Instagram did not return an authorization code.", "warning")
         return redirect(url_for("main.social_account_settings"))
 
-    redirect_uri = url_for("main.instagram_oauth_callback", _external=True)
+    redirect_uri = _external_oauth_url("main.instagram_oauth_callback")
     return _complete_instagram_oauth_connection(code, redirect_uri)
 
 
@@ -1253,6 +1255,14 @@ def _meta_app_credentials(credentials=None):
     facebook_account = decrypt_credentials_for_publisher("Facebook")
     facebook_credentials = (facebook_account or {}).get("credentials", {})
     return facebook_credentials.get("app_id", ""), facebook_credentials.get("app_secret", "")
+
+
+def _external_oauth_url(endpoint):
+    # Render terminates HTTPS before Flask sees the request. For OAuth, the
+    # redirect_uri must match Meta's allowlist exactly, including the scheme.
+    if request.host.endswith("onrender.com"):
+        return url_for(endpoint, _external=True, _scheme="https")
+    return url_for(endpoint, _external=True)
 
 
 def _generate_long_lived_facebook_page_token(page_id, app_id, app_secret, short_lived_user_token):
