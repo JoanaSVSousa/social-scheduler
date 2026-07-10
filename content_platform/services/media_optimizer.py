@@ -1,5 +1,8 @@
 from io import BytesIO
 from pathlib import Path
+import os
+import shutil
+import subprocess
 from tempfile import gettempdir
 from uuid import uuid4
 
@@ -11,6 +14,7 @@ from .public_media import PublicMediaError, upload_public_media
 OPTIMIZED_MEDIA_DIR = Path(gettempdir()) / "content_automation_platform_media"
 DEFAULT_IMAGE_LIMIT_BYTES = 1_900_000
 DEFAULT_MAX_DIMENSION = 1800
+DEFAULT_VIDEO_LIMIT_BYTES = 18_000_000
 
 
 def prepare_media_for_publish(media_items, image_limit_bytes=DEFAULT_IMAGE_LIMIT_BYTES):
@@ -20,17 +24,68 @@ def prepare_media_for_publish(media_items, image_limit_bytes=DEFAULT_IMAGE_LIMIT
         path = (UPLOAD_DIR / item["filename"]).resolve()
         item["publish_path"] = path
         item["publish_content_type"] = _content_type_for_path(path)
-        if not item.get("public_url"):
-            item["public_url"] = _ensure_public_url(item, path)
 
         if item["media_type"] == "image":
             optimized = optimize_image_file(path, image_limit_bytes=image_limit_bytes)
             if optimized:
                 item["publish_path"] = optimized["path"]
                 item["publish_content_type"] = optimized["content_type"]
+        elif item["media_type"] == "video":
+            path = _replace_with_optimized_video(item, path)
+            item["publish_path"] = path
+            item["publish_content_type"] = _content_type_for_path(path)
+
+        if item.get("optimization_failed"):
+            item["public_url"] = ""
+        elif not item.get("public_url"):
+            item["public_url"] = _ensure_public_url(item, item["publish_path"])
 
         prepared.append(item)
     return prepared
+
+
+def _replace_with_optimized_video(item, path):
+    try:
+        needs_optimization = path.suffix.lower() != ".mp4" or path.stat().st_size > DEFAULT_VIDEO_LIMIT_BYTES
+    except OSError:
+        item["optimization_failed"] = True
+        return path
+
+    optimized = optimize_video_file(path)
+    if not optimized:
+        if needs_optimization:
+            item["optimization_failed"] = True
+        return path
+
+    optimized_path = optimized["path"]
+    if optimized_path == path:
+        return path
+
+    target_path = path if path.suffix.lower() == ".mp4" else path.with_suffix(".mp4")
+    if target_path != path and target_path.exists():
+        target_path.unlink()
+    if path.exists():
+        path.unlink()
+    optimized_path.replace(target_path)
+
+    updates = {"public_url": ""}
+    if target_path.name != item["filename"]:
+        updates["filename"] = target_path.name
+        item["filename"] = target_path.name
+    item["public_url"] = ""
+    _update_media_item(item["id"], updates)
+    return target_path
+
+
+def _update_media_item(media_id, values):
+    if not values:
+        return
+    assignments = ", ".join(f"{key} = ?" for key in values)
+    with get_connection() as conn:
+        conn.execute(
+            f"UPDATE media_assets SET {assignments} WHERE id = ?",
+            (*values.values(), media_id),
+        )
 
 
 def _ensure_public_url(media_item, path):
@@ -65,6 +120,81 @@ def optimize_image_file(path, image_limit_bytes=DEFAULT_IMAGE_LIMIT_BYTES):
     optimized_path = OPTIMIZED_MEDIA_DIR / f"{uuid4().hex}.jpg"
     optimized_path.write_bytes(optimized_data)
     return {"path": optimized_path, "content_type": "image/jpeg"}
+
+
+def optimize_video_file(path, video_limit_bytes=DEFAULT_VIDEO_LIMIT_BYTES, force=False):
+    try:
+        size = path.stat().st_size
+    except OSError:
+        return None
+    if not force and size <= video_limit_bytes and path.suffix.lower() == ".mp4":
+        return {"path": path, "content_type": "video/mp4"}
+
+    ffmpeg_path = _ffmpeg_path()
+    if not ffmpeg_path:
+        return None
+
+    OPTIMIZED_MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+    optimized_path = OPTIMIZED_MEDIA_DIR / f"{uuid4().hex}.mp4"
+    command = [
+        ffmpeg_path,
+        "-y",
+        "-i",
+        str(path),
+        "-vf",
+        "scale='min(1080,iw)':-2",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-crf",
+        "28",
+        "-maxrate",
+        "2500k",
+        "-bufsize",
+        "5000k",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "128k",
+        "-movflags",
+        "+faststart",
+        str(optimized_path),
+    ]
+    try:
+        subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=180)
+    except (OSError, subprocess.SubprocessError):
+        if optimized_path.exists():
+            optimized_path.unlink()
+        return None
+
+    try:
+        if optimized_path.stat().st_size <= video_limit_bytes:
+            return {"path": optimized_path, "content_type": "video/mp4"}
+    except OSError:
+        return None
+    return {"path": optimized_path, "content_type": "video/mp4"}
+
+
+def _ffmpeg_path():
+    configured_path = os.environ.get("FFMPEG_BINARY") or os.environ.get("IMAGEIO_FFMPEG_EXE")
+    if configured_path:
+        return configured_path
+
+    system_path = shutil.which("ffmpeg")
+    if system_path:
+        return system_path
+
+    try:
+        import imageio_ffmpeg
+    except ImportError:
+        return ""
+    try:
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:
+        return ""
 
 
 def optimize_image_bytes(data, image_limit_bytes=DEFAULT_IMAGE_LIMIT_BYTES):
@@ -126,4 +256,8 @@ def _content_type_for_path(path):
         return "image/webp"
     if suffix == ".gif":
         return "image/gif"
+    if suffix in {".mp4", ".m4v", ".mov"}:
+        return "video/mp4"
+    if suffix == ".webm":
+        return "video/webm"
     return "application/octet-stream"

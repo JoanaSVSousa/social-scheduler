@@ -6,7 +6,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlparse
 from urllib.request import Request, urlopen
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, session, url_for
+from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, session, url_for
 
 from .models import (
     FORMAT_MEDIA_GUIDES,
@@ -660,6 +660,8 @@ def remove_media(media_id):
     validate_csrf()
     post_id = request.form.get("post_id")
     delete_media(media_id)
+    if request.headers.get("X-Requested-With") == "fetch":
+        return jsonify({"ok": True, "media_id": media_id})
     if post_id:
         return redirect(url_for("main.edit_post", post_id=post_id))
     return redirect(url_for("main.posts"))

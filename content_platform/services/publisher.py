@@ -1,3 +1,4 @@
+from ..models import FORMAT_MEDIA_RULES
 from .media import get_media_for_post
 from .media_optimizer import prepare_media_for_publish
 from .platform_publishers import is_platform_publishable, publish_to_platform
@@ -77,6 +78,7 @@ def publish_rss_group_now(posts):
 
 def _publish_post(post, reason):
     media_items = prepare_media_for_publish(get_media_for_post(post["id"]))
+    _validate_media_requirements(post, media_items)
     uri = publish_to_platform(post, media_items)
     mark_post_status(post["id"], "Published")
     add_log(
@@ -85,3 +87,22 @@ def _publish_post(post, reason):
         f"{reason} Published to {post['platform']} with {len(media_items)} media asset(s). Result: {uri}",
     )
     return uri
+
+
+def _validate_media_requirements(post, media_items):
+    content_format = post["content_format"] or ""
+    rules = FORMAT_MEDIA_RULES.get(content_format)
+    if not rules:
+        return
+
+    allowed_media_types = rules.get("allowed_media_types", [])
+    media_types = [item.get("media_type") for item in media_items if hasattr(item, "get")]
+    matching_media = [media_type for media_type in media_types if media_type in allowed_media_types]
+
+    if rules.get("media_required") and not matching_media:
+        required = " or ".join(allowed_media_types) if allowed_media_types else "media"
+        raise ValueError(f"{post['platform']} {content_format} requires {required} media before publishing.")
+
+    if media_items and allowed_media_types and not matching_media:
+        allowed = " or ".join(allowed_media_types)
+        raise ValueError(f"{post['platform']} {content_format} only accepts {allowed} media.")

@@ -1,92 +1,149 @@
 # Deployment Options
 
-## Option A: PythonAnywhere
+## Objetivo
 
-Best when you want the simplest path from local Flask + SQLite to online.
+O projeto foi desenhado para correr em dois modos:
 
-Good fit for:
+- localmente, para desenvolvimento e testes;
+- online, para uso real por uma equipa pequena.
 
-- Flask app;
-- SQLite;
-- scheduled tasks;
-- hourly RSS checks;
-- email report scripts;
-- small private team usage.
+## Opcao A: Local + SQLite
 
-Tradeoff:
+Melhor para:
 
-- less flexible than a full cloud setup;
-- scaling and team workflows are more limited.
+- desenvolvimento;
+- testes de funcionalidades;
+- apresentacao em aula;
+- demo sem custos.
 
-Recommended if the priority is to start using the tool quickly.
+Como corre:
 
-## Option B: Render + Supabase
+```bash
+python3 app.py
+```
 
-Best when you want a more production-like setup for a small team.
+Base de dados:
 
-Good fit for:
+```txt
+data/scheduler.db
+```
 
-- hosted Flask app on Render;
-- Postgres database on Supabase;
-- team access;
-- future API integrations;
-- persistent online usage.
+## Opcao B: Render + Supabase
 
-Tradeoff:
+Melhor para:
 
-- uploads need object storage or another persistent file strategy;
-- more setup work.
+- equipa pequena;
+- uso real online;
+- RSS checks recorrentes;
+- API publishing;
+- storage publico para media;
+- Postgres em producao.
 
-Recommended if the priority is collaboration and long-term use.
+Componentes:
 
-Current project status:
+```txt
+Render Web Service
+-> Flask + Gunicorn
 
-- Render web service files are prepared: `render.yaml` and `Procfile`.
-- Secrets must be configured in Render environment variables, not committed to GitHub.
-- The database layer supports local SQLite and Supabase/Postgres via `DATABASE_URL`.
-- Before using media uploads heavily in production, move uploads to persistent object storage.
-- On Render, use the Supabase pooler connection string for `DATABASE_URL`. If the direct database URL fails with `Network is unreachable`, it is probably resolving to IPv6.
+Supabase Postgres
+-> dados da aplicacao
 
-Safe GitHub checklist:
+Supabase Storage
+-> imagens/videos publicos usados pelas APIs
 
-- Commit `.env.example`, never a real `.env`.
-- Do not commit `data/scheduler.db`.
-- Do not commit `static/uploads/`.
-- Store passwords, SMTP credentials, and database URLs only as deployment environment variables.
+Render Cron Job
+-> RSS check de 2 em 2 horas
+```
 
-## Suggested Path
+## Variaveis de ambiente
 
-1. Use SQLite locally while polishing the product.
-2. Create the demo version for portfolio/recruiters.
-3. Deploy first private version on PythonAnywhere if speed matters.
-4. Move to Render + Supabase when the team really starts depending on it.
+Nunca guardar valores reais no GitHub.
 
-## Deployment Readiness Checklist
+Essenciais:
 
-- Set `ADMIN_PASSWORD`.
-- Set `ADMIN_USERNAME`.
-- Set `SECRET_KEY`.
-- Disable Flask debug mode.
-- Configure SMTP env vars.
-- Configure hourly RSS script.
-- Configure daily/weekly email report script.
-- Decide where uploads should live.
-- Set `DATABASE_URL` when using Supabase/Postgres.
+```bash
+SECRET_KEY="long-random-secret"
+CREDENTIALS_ENCRYPTION_KEY="generated-fernet-key"
+ADMIN_USERNAME="SquaredRedes"
+ADMIN_PASSWORD="strong-password"
+DATABASE_URL="postgresql://USER:PASSWORD@POOLER_HOST:6543/postgres?sslmode=require"
+```
+
+Supabase Storage:
+
+```bash
+SUPABASE_URL="https://your-project.supabase.co"
+SUPABASE_SERVICE_ROLE_KEY="server-only-service-role-key"
+SUPABASE_MEDIA_BUCKET="social-media"
+```
+
+Opcional para video:
+
+```bash
+FFMPEG_BINARY="/usr/bin/ffmpeg"
+```
+
+## Supabase/Postgres
+
+Em desenvolvimento, a app usa SQLite.
+
+Em producao, se `DATABASE_URL` existir, usa Supabase/Postgres.
+
+No Render, usar preferencialmente o pooler do Supabase:
+
+```txt
+postgresql://USER:PASSWORD@POOLER_HOST:6543/postgres?sslmode=require
+```
+
+Isto evita problemas de IPv6 que podem acontecer com o host direto.
+
+## Supabase Storage
+
+Meta APIs precisam de URLs publicos para publicar imagens e videos.
+
+Por isso:
+
+1. criar bucket no Supabase;
+2. usar nome configurado em `SUPABASE_MEDIA_BUCKET`;
+3. tornar o bucket publico ou garantir public URLs;
+4. configurar `SUPABASE_SERVICE_ROLE_KEY` apenas no Render.
+
+Nunca expor `SUPABASE_SERVICE_ROLE_KEY` no frontend.
 
 ## Render Cron Jobs
 
-Use a Render Cron Job for the RSS automation instead of keeping the web process busy.
-
-Command:
+RSS automation:
 
 ```bash
 python3 scripts/check_rss_feeds.py
 ```
 
-Schedule for every 2 hours:
+Schedule recomendado:
 
 ```txt
 0 */2 * * *
 ```
 
-The Cron Job must use the same environment variables as the web service, especially `DATABASE_URL`.
+O Cron Job deve usar as mesmas variaveis de ambiente do Web Service.
+
+## Checklist antes de mostrar a recrutador
+
+- GitHub publico sem secrets reais.
+- `.env` fora do repo.
+- `.env.example` com placeholders.
+- `data/scheduler.db` fora do repo.
+- uploads reais fora do repo.
+- README atualizado.
+- app com login ativo.
+- Render deploy funcional.
+- Supabase conectado.
+- pelo menos um exemplo real de publicacao/log.
+
+## Roadmap de producao
+
+- retry/backoff para publicacoes falhadas;
+- testes automatizados;
+- verificacao de API em todas as redes;
+- storage lifecycle/cleanup;
+- roles por utilizador;
+- monitorizacao de jobs recorrentes.

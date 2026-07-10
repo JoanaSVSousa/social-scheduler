@@ -129,7 +129,7 @@
         {% if media %}
         <div class="media-grid">
             {% for item in media %}
-            <article class="media-card">
+            <article class="media-card" data-media-card="{{ item.id }}">
                 {% if item.media_type == "video" %}
                 <video src="{{ url_for('static', filename='uploads/' ~ item.filename) }}" controls></video>
                 {% else %}
@@ -139,9 +139,10 @@
                     <strong>{{ item.original_filename }}</strong>
                     <button
                         class="button danger"
-                        type="submit"
-                        formmethod="post"
-                        formaction="{{ url_for('main.remove_media', media_id=item.id) }}"
+                        type="button"
+                        data-delete-media
+                        data-media-id="{{ item.id }}"
+                        data-delete-url="{{ url_for('main.remove_media', media_id=item.id) }}"
                     >Remove</button>
                 </div>
             </article>
@@ -179,9 +180,9 @@
                 {% if media %}
                     {% for item in media[:4] %}
                         {% if item.media_type == "video" %}
-                        <video src="{{ url_for('static', filename='uploads/' ~ item.filename) }}" controls muted></video>
+                        <video data-preview-media-id="{{ item.id }}" src="{{ url_for('static', filename='uploads/' ~ item.filename) }}" controls muted></video>
                         {% else %}
-                        <img src="{{ url_for('static', filename='uploads/' ~ item.filename) }}" alt="{{ item.original_filename }}">
+                        <img data-preview-media-id="{{ item.id }}" src="{{ url_for('static', filename='uploads/' ~ item.filename) }}" alt="{{ item.original_filename }}">
                         {% endif %}
                     {% endfor %}
                 {% else %}
@@ -348,6 +349,36 @@ hashtagsInput.addEventListener("input", () => {
     syncPreview();
 });
 mediaInput.addEventListener("change", syncSelectedMediaPreview);
+
+document.querySelectorAll("[data-delete-media]").forEach((button) => {
+    button.addEventListener("click", async () => {
+        const token = document.querySelector("input[name='csrf_token']")?.value || "";
+        const formData = new FormData();
+        formData.append("csrf_token", token);
+        formData.append("post_id", document.querySelector("input[name='post_id']")?.value || "");
+
+        button.disabled = true;
+        try {
+            const response = await fetch(button.dataset.deleteUrl, {
+                method: "POST",
+                headers: {"X-Requested-With": "fetch"},
+                body: formData,
+            });
+            if (!response.ok) {
+                throw new Error("Media could not be removed.");
+            }
+            document.querySelector(`[data-media-card="${button.dataset.mediaId}"]`)?.remove();
+            document.querySelectorAll(`[data-preview-media-id="${button.dataset.mediaId}"]`).forEach((item) => item.remove());
+            if (!previewMedia.children.length) {
+                previewMedia.innerHTML = '<div class="preview-media-empty">No media attached yet</div>';
+            }
+        } catch (error) {
+            button.disabled = false;
+            alert(error.message);
+        }
+    });
+});
+
 syncFormats();
 enforceContentBudget();
 scheduledDate.required = statusSelect.value === "Scheduled";

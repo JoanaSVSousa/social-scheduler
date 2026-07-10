@@ -114,6 +114,12 @@ def publish_to_facebook(post, media_items):
     if not text:
         raise PublicationError("Post content is empty. The title is internal and is not published.")
 
+    normalized_format = (post["content_format"] or "").lower()
+    if "story" in normalized_format or "reel" in normalized_format:
+        raise PublicationError(
+            "Facebook Story/Reel publishing is not implemented yet. Choose Feed Post/Video Post for API publishing, or publish this format manually."
+        )
+
     public_media = _first_public_media(media_items)
     if media_items and not public_media:
         raise PublicationError("Facebook media publishing needs a public image/video URL. Configure Supabase Storage public media first.")

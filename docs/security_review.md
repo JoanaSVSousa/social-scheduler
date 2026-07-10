@@ -2,51 +2,67 @@
 
 ## Objetivo
 
-Esta aplicacao e um projeto academico, mas foi endurecida com praticas comuns de seguranca para uma app Flask com formularios, SQLite e upload de ficheiros.
+Esta aplicacao e um projeto academico com ambicao de uso real. Por isso, foram aplicadas praticas de seguranca comuns em apps Flask com formularios, base de dados, uploads e credenciais externas.
 
 ## Protecoes implementadas
 
-### Area protegida
+### Login
 
-A area de RSS intake esta protegida por login de admin.
+A aplicacao inteira esta protegida por login.
 
-Agora a aplicacao inteira tambem esta protegida por login, para nao expor posts, RSS, logs ou dados editaveis.
+Credenciais reais devem vir de variaveis de ambiente:
 
-Em desenvolvimento existe uma password local por defeito, mas para uso real deve ser configurada por variavel de ambiente.
-
-O username tambem pode ser configurado por `ADMIN_USERNAME`.
-
-### SQL Injection
-
-As queries usam parametros `?` do SQLite.
-
-Isto evita concatenar diretamente input do utilizador em SQL.
+```bash
+ADMIN_USERNAME
+ADMIN_PASSWORD
+SECRET_KEY
+```
 
 ### CSRF
 
 Todos os formularios `POST` usam token CSRF.
 
-Rotas protegidas:
+Exemplos:
 
 - criar post;
 - editar post;
+- publicar;
 - apagar post;
 - apagar media;
-- processar queue.
+- gerir RSS;
+- guardar credenciais de API.
 
-Se um pedido `POST` nao tiver token valido, a app responde com `400 Bad Request`.
+### SQL Injection
+
+As queries usam parametros em vez de concatenar input do utilizador.
+
+Frase para explicar:
+
+> O input do utilizador nunca e usado diretamente para construir SQL.
+
+### Validacao de input
+
+A app valida:
+
+- plataformas permitidas;
+- estados permitidos;
+- formatos permitidos por plataforma;
+- limites de titulo, conteudo e hashtags;
+- datas de schedule;
+- media obrigatoria em formatos como Image Post, Video Post, Reel, Story e Short.
 
 ### Uploads
 
-Os uploads sao protegidos por varias camadas:
+Camadas de protecao:
 
 - extensoes permitidas;
-- nomes reais limpos com `secure_filename`;
-- nome final gerado por UUID;
-- limite de tamanho por ficheiro;
-- limite global de request;
 - verificacao basica da assinatura do ficheiro;
-- ficheiros nao suportados sao ignorados e mostram aviso.
+- limite de tamanho;
+- nomes finais por UUID;
+- `secure_filename` para nome original;
+- conversao/compressao de videos para MP4;
+- compressao de imagens quando necessario;
+- remocao segura com path validation.
 
 Formatos aceites:
 
@@ -59,48 +75,67 @@ Formatos aceites:
 - M4V;
 - WEBM.
 
-### Path Traversal
+### Media publishing guard rails
 
-Os ficheiros guardados usam nomes gerados pela aplicacao, nao nomes fornecidos pelo utilizador.
+A app bloqueia publicacoes que nao tenham a media necessaria para o formato escolhido.
 
-Ao apagar media, o caminho e resolvido e verificado para garantir que pertence a pasta de uploads.
+Exemplo:
 
-### Validacao de dados
+- `Video Post` precisa de video;
+- `Image Post` precisa de imagem;
+- `Story/Reel` nao deve cair automaticamente para feed post.
 
-A app valida:
+Isto evita publicacoes erradas.
 
-- plataforma permitida;
-- estado permitido;
-- formato valido para a plataforma escolhida;
-- titulo obrigatorio e com limite;
-- conteudo obrigatorio e com limite;
-- hashtags com limite;
-- posts `Scheduled` precisam de data/hora.
+### Credenciais de API
+
+Credenciais sociais sao guardadas encriptadas.
+
+Variavel critica:
+
+```bash
+CREDENTIALS_ENCRYPTION_KEY
+```
+
+Nota importante:
+
+> Se esta chave mudar, credenciais ja guardadas deixam de poder ser desencriptadas.
+
+### Secrets
+
+Secrets ficam em variaveis de ambiente:
+
+- passwords;
+- database URLs;
+- SMTP;
+- Supabase service role key;
+- tokens de redes sociais;
+- app secrets.
+
+Nunca devem ser commitados no GitHub.
 
 ### Headers de seguranca
 
-A app envia headers de seguranca:
+A app envia:
 
 - `Content-Security-Policy`;
 - `X-Content-Type-Options`;
 - `X-Frame-Options`;
 - `Referrer-Policy`;
-- `Permissions-Policy`.
+- `Permissions-Policy`;
+- `Strict-Transport-Security` em HTTPS.
 
 ## Pontos ainda a evoluir
 
-Para producao real, os proximos passos seriam:
+- login por utilizador individual;
+- roles/permissoes por equipa;
+- rate limiting;
+- testes automatizados de seguranca;
+- auditoria automatica de dependencias;
+- rotacao guiada de tokens;
+- limpeza periodica de media antiga;
+- CSP mais restrita quando todas as fontes externas estiverem fechadas.
 
-- usar `SECRET_KEY` forte via variavel de ambiente;
-- manter `debug` desligado em producao (`FLASK_DEBUG=1` apenas em desenvolvimento local);
-- usar HTTPS;
-- adicionar autenticacao/login;
-- adicionar autorizacao por utilizador;
-- guardar uploads fora da pasta publica e servir com controlo de acesso;
-- adicionar rate limiting;
-- criar testes automatizados de seguranca;
-- auditar dependencias.
+## Frase para aula/recrutador
 
-## Como explicar a um recrutador
-
-> Alem da funcionalidade principal, preocupei-me com a seguranca da aplicacao. A app usa queries parametrizadas, tokens CSRF, validacao de input, verificacao de uploads, nomes de ficheiro gerados por UUID e headers de seguranca. Isto mostra que pensei no projeto como uma aplicacao real, nao apenas como um prototipo academico.
+> Para alem das funcionalidades, pensei na seguranca: login, CSRF, queries parametrizadas, validacao de input, upload seguro, compressao de media, headers de seguranca e credenciais de API encriptadas. Isto mostra que tratei o projeto como uma aplicacao real.

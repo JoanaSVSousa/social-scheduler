@@ -12,7 +12,7 @@ UPLOAD_DIR = PROJECT_ROOT / "static" / "uploads"
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp", "mp4", "mov", "m4v", "webm"}
 IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 VIDEO_EXTENSIONS = {"mp4", "mov", "m4v", "webm"}
-MAX_FILE_SIZE = 20 * 1024 * 1024
+MAX_FILE_SIZE = 40 * 1024 * 1024
 
 
 def save_media_files(post_id, files, content_format=""):
@@ -25,8 +25,9 @@ def save_media_files(post_id, files, content_format=""):
             continue
 
         extension = _extension(file.filename)
-        if extension not in ALLOWED_EXTENSIONS or not _is_safe_upload(file, extension):
-            skipped.append(f"{file.filename} (unsupported file type or invalid file)")
+        safe_upload, safety_reason = _safe_upload_result(file, extension)
+        if extension not in ALLOWED_EXTENSIONS or not safe_upload:
+            skipped.append(f"{file.filename} ({safety_reason})")
             continue
 
         original_filename = secure_filename(file.filename)
@@ -34,16 +35,26 @@ def save_media_files(post_id, files, content_format=""):
             skipped.append(file.filename)
             continue
 
-        filename = f"{uuid4().hex}.{extension}"
         media_type = "video" if extension in VIDEO_EXTENSIONS else "image"
         if not _is_allowed_for_format(content_format, media_type):
             skipped.append(f"{original_filename} ({content_format} does not accept {media_type} media)")
             continue
 
+        stored_extension = "mp4" if media_type == "video" else extension
+        filename = f"{uuid4().hex}.{stored_extension}"
         path = UPLOAD_DIR / filename
         public_url = ""
         try:
             file.save(path)
+            if media_type == "video":
+                from .media_optimizer import optimize_video_file
+
+                optimized = optimize_video_file(path, force=extension != "mp4")
+                if not optimized:
+                    raise RuntimeError("video could not be compressed")
+                if optimized["path"] != path:
+                    path.unlink(missing_ok=True)
+                    optimized["path"].replace(path)
             public_url = upload_public_media(path, f"posts/{post_id}/{filename}")
             with get_connection() as conn:
                 conn.execute(
@@ -58,10 +69,10 @@ def save_media_files(post_id, files, content_format=""):
                 path.unlink()
             skipped.append(f"{original_filename} ({exc})")
             continue
-        except Exception:
+        except Exception as exc:
             if path.exists():
                 path.unlink()
-            skipped.append(f"{original_filename} (could not be saved)")
+            skipped.append(f"{original_filename} ({exc or 'could not be saved'})")
             continue
 
         saved.append(filename)
@@ -130,28 +141,31 @@ def _extension(filename):
     return filename.rsplit(".", 1)[1].lower()
 
 
-def _is_safe_upload(file, extension):
+def _safe_upload_result(file, extension):
+    if extension not in ALLOWED_EXTENSIONS:
+        return False, "unsupported file type"
+
     stream = file.stream
     position = stream.tell()
-    header = stream.read(32)
+    header = stream.read(4096)
     stream.seek(0, 2)
     size = stream.tell()
     stream.seek(position)
 
     if size > MAX_FILE_SIZE:
-        return False
+        return False, f"file is larger than {MAX_FILE_SIZE // (1024 * 1024)} MB"
 
     if extension == "png":
-        return header.startswith(b"\x89PNG\r\n\x1a\n")
+        return header.startswith(b"\x89PNG\r\n\x1a\n"), "invalid PNG file"
     if extension in {"jpg", "jpeg"}:
-        return header.startswith(b"\xff\xd8\xff")
+        return header.startswith(b"\xff\xd8\xff"), "invalid JPEG file"
     if extension == "gif":
-        return header.startswith((b"GIF87a", b"GIF89a"))
+        return header.startswith((b"GIF87a", b"GIF89a")), "invalid GIF file"
     if extension == "webp":
-        return header.startswith(b"RIFF") and header[8:12] == b"WEBP"
+        return header.startswith(b"RIFF") and header[8:12] == b"WEBP", "invalid WEBP file"
     if extension == "webm":
-        return header.startswith(b"\x1a\x45\xdf\xa3")
+        return header.startswith(b"\x1a\x45\xdf\xa3"), "invalid WEBM file"
     if extension in {"mp4", "mov", "m4v"}:
-        return b"ftyp" in header[4:16]
+        return b"ftyp" in header, "invalid MP4/MOV file"
 
-    return False
+    return False, "unsupported file type"

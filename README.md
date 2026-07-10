@@ -1,33 +1,73 @@
 # Content Automation Platform
 
-A Python platform for planning, scheduling, and tracking content publication across multiple channels.
+A Flask + Python platform for planning, adapting, scheduling, and publishing content across multiple social networks.
 
-This project is designed as an automation-focused academic project that can run locally with SQLite and in production with Supabase/Postgres.
+This project started as an academic scheduling project and evolved into an automation platform for real content operations: RSS intake, draft generation, platform-specific versions, media management, scheduling, recycling, logs, email reports, and API publishing.
 
-## Features
+## Elevator Pitch
 
-- Dashboard with publication status counters
-- Create, edit, delete, and list content posts
-- Schedule posts by date, time, and platform
-- Track status: Draft, Scheduled, Published, Failed
-- Filter posts by platform, status, and search term
-- Publication queue for posts that are due
-- Logging for automation events
-- Modular architecture prepared for future API publishers, retries, AI suggestions, and analytics
-- Protected RSS intake that turns new feed items into draft posts
-- Recycled posts with multiple schedule dates
-- Grouped RSS article editor for adapting copy, formats, schedules, and media per social network
-- RSS duplicate protection by source URL, useful when a general feed overlaps with category feeds
+Content Automation Platform helps a small team manage the full publication workflow:
+
+```txt
+RSS/article discovery
+-> draft generation
+-> network-specific copy and format
+-> media upload/optimization
+-> scheduling/recycling
+-> queue processing
+-> API publishing
+-> logs and reporting
+```
+
+The goal is not just to store posts. The goal is to model a real automation workflow with state, validation, repeatable jobs, and clear operational feedback.
+
+## Current Capabilities
+
+- Login-protected web app
+- Dashboard with status counters, platform counts, upcoming queue, and monthly calendar
+- Post library with filters, sorting, grouped RSS articles, and publish-now actions
+- Manual posts and RSS-generated draft posts
+- Platform-specific versions for the same RSS article
+- General defaults with per-network overrides
+- Scheduling and recycled publication dates
+- Drag-and-drop calendar rescheduling
+- Logs for publication, RSS, API, and operational events
+- Email dashboard report script
+- SQLite for local development
+- Supabase/Postgres support for production
+- Supabase Storage support for public media URLs
+- Image compression for API limits
+- Video upload validation and MP4 compression/conversion pipeline
+- Real API publishing for Bluesky and Facebook feed/photo/video posts
+- Credential storage encrypted at rest
+- API account verification for Meta/Facebook and Instagram credentials
+
+## Platform Status
+
+| Platform | Status |
+| --- | --- |
+| Bluesky | Real publishing implemented for text, links, hashtags, and image embeds. |
+| Facebook | Real Page publishing implemented for feed posts, link posts, photos, and videos. Stories/Reels are protected until dedicated endpoints are implemented. |
+| Instagram | Credential storage and publishing flow scaffolded. Needs final credential verification/testing for real use. |
+| Threads | Credential storage and publishing flow scaffolded. Needs correct user token flow and final testing. |
+| X | Kept in roadmap/manual flow because free general API access is deprecated. |
+| LinkedIn | Credential storage and text/link publishing scaffolded. |
+| TikTok | Credential storage scaffolded; upload flow is roadmap. |
+| YouTube Shorts | Credential storage scaffolded; resumable video upload is roadmap. |
 
 ## Tech Stack
 
-- Python
+- Python 3.12
 - Flask
 - SQLite locally
 - Supabase/Postgres in production
-- HTML/CSS
+- Supabase Storage for public media assets
+- HTML, Jinja templates, CSS, and vanilla JavaScript
+- Pillow for image optimization
+- imageio-ffmpeg/ffmpeg for video conversion and compression
+- Gunicorn on Render
 
-Production is pinned to Python 3.12 through `.python-version`, `runtime.txt`, and `PYTHON_VERSION` in `render.yaml` for Render compatibility.
+Production is pinned to Python 3.12 through `.python-version`, `runtime.txt`, and `PYTHON_VERSION` in `render.yaml`.
 
 ## Run Locally
 
@@ -44,13 +84,39 @@ Then open:
 http://127.0.0.1:5000
 ```
 
+## Environment Variables
+
+Use `.env.example` as a template. Never commit real secrets.
+
+Required for production:
+
+```bash
+SECRET_KEY="long-random-secret"
+CREDENTIALS_ENCRYPTION_KEY="generated-fernet-key"
+ADMIN_USERNAME="SquaredRedes"
+ADMIN_PASSWORD="strong-password"
+DATABASE_URL="postgresql://USER:PASSWORD@POOLER_HOST:6543/postgres?sslmode=require"
+```
+
+For public media uploads:
+
+```bash
+SUPABASE_URL="https://your-project.supabase.co"
+SUPABASE_SERVICE_ROLE_KEY="server-only-service-role-key"
+SUPABASE_MEDIA_BUCKET="social-media"
+```
+
+Optional video fallback:
+
+```bash
+FFMPEG_BINARY="/usr/bin/ffmpeg"
+```
+
 ## Supabase/Postgres
 
-The app uses SQLite when `DATABASE_URL` is not set. For Render + Supabase, set `DATABASE_URL` in Render using the Supabase Postgres connection string.
+The app uses SQLite when `DATABASE_URL` is not set. For Render + Supabase, set `DATABASE_URL` in Render.
 
-On Render, prefer the Supabase pooler connection string instead of the direct database host. The direct host can resolve to IPv6 and fail from Render with `Network is unreachable`.
-
-Use a connection string shaped like:
+On Render, prefer the Supabase pooler connection string instead of the direct database host:
 
 ```txt
 postgresql://USER:PASSWORD@POOLER_HOST:6543/postgres?sslmode=require
@@ -58,54 +124,30 @@ postgresql://USER:PASSWORD@POOLER_HOST:6543/postgres?sslmode=require
 
 Do not commit the real value to GitHub.
 
-## Protected RSS Area
+## RSS Workflow
 
-RSS management is protected by an admin login.
+RSS management is protected by login.
 
-For local development, the default credentials are:
-
-```txt
-Username: SquaredRedes
-Password: change-me-local-admin
-```
-
-For real use, set these environment variables:
-
-```bash
-export ADMIN_PASSWORD="your-strong-password"
-export ADMIN_USERNAME="SquaredRedes"
-export SECRET_KEY="your-strong-secret-key"
-export CREDENTIALS_ENCRYPTION_KEY="generate-with-python-scripts-generate-encryption-key-py"
-```
-
-`CREDENTIALS_ENCRYPTION_KEY` protects saved social API credentials. Keep it stable in Render; changing it means existing saved credentials cannot be decrypted.
-
-Then open:
-
-```txt
-http://127.0.0.1:5000/rss
-```
-
-## Squared Potato RSS Feeds
-
-Seed the Squared Potato feeds in the current database:
+Seed the Squared Potato feeds:
 
 ```bash
 python3 scripts/seed_squared_feeds.py
 ```
 
-Seed and immediately import new items as draft posts:
+Seed and immediately import new items as drafts:
 
 ```bash
 python3 scripts/seed_squared_feeds.py --check-now
 ```
 
-Configured feeds:
+Configured Squared Potato feeds:
 
 - jogos: Facebook, Bluesky, X
 - filmes: Facebook, Bluesky, X
 - livros: Facebook, Bluesky, X
 - tecnologia: Facebook, Bluesky, X
+
+RSS duplicate protection uses the source URL, so a future general feed should not duplicate articles already imported from category feeds.
 
 ## Recurring RSS Task
 
@@ -115,111 +157,105 @@ On Render, create a Cron Job that runs every 2 hours:
 python3 scripts/check_rss_feeds.py
 ```
 
-It checks active RSS feeds, skips already imported items, and creates draft posts for the configured target platforms.
-
-The in-app `Check feeds now` button runs a quick check only. Use the Render Cron Job for the regular full automation.
-
 Recommended schedule:
 
 ```txt
 0 */2 * * *
 ```
 
-## RSS Media Workflow
+The Cron Job must use the same environment variables as the web service, especially `DATABASE_URL`.
 
-RSS imports store the source article image URL when the feed exposes one through RSS media tags, image enclosures, or the article summary HTML.
+## Media Workflow
 
-In `Posts`, RSS articles are grouped into one row. Use `Edit versions` to adapt each network version on one page:
+Accepted upload formats:
 
-- choose the networks for that article;
-- edit copy and format per platform;
-- add recycling dates;
-- upload images or videos per network version;
-- use the source article image preview as a reference for media selection.
+- PNG
+- JPG/JPEG
+- GIF
+- WEBP
+- MP4
+- MOV
+- M4V
+- WEBM
 
-In production, uploaded media is stored locally and, when Supabase Storage is configured, also uploaded to a public bucket. The public URL is required for Meta publishers such as Threads, Instagram, and Facebook when publishing images, videos, reels, and stories.
+Images are optimized before API upload when needed.
 
-Render environment variables for public media storage:
+Videos are converted/compressed to MP4 for safer publishing. The compressed version replaces the uploaded version, so the app does not keep duplicate heavy files.
 
-```bash
-export SUPABASE_URL="https://your-project.supabase.co"
-export SUPABASE_SERVICE_ROLE_KEY="server-only-service-role-key"
-export SUPABASE_MEDIA_BUCKET="social-media"
-```
-
-The bucket must be public, or at least expose public read URLs for the uploaded objects. Do not commit the service role key to GitHub and do not expose it in frontend code.
+For Meta APIs, uploaded media must have a public URL. In production, this is handled through Supabase Storage.
 
 ## Email Dashboard Report
 
-Send a dashboard-style email report with upcoming posts, recycled schedules, platform counts, and recent logs:
+Send a dashboard-style email report:
 
 ```bash
 python3 scripts/send_dashboard_report.py
 ```
 
-Preview the report without sending email:
+Preview without sending:
 
 ```bash
 python3 scripts/send_dashboard_report.py --dry-run
 ```
 
-Required environment variables for email:
+Required SMTP variables:
 
 ```bash
-export SMTP_HOST="smtp.example.com"
-export SMTP_PORT="587"
-export SMTP_USERNAME="your@email.com"
-export SMTP_PASSWORD="your-password"
-export SMTP_FROM_EMAIL="your@email.com"
-export REPORT_TO_EMAIL="team@email.com"
+SMTP_HOST="smtp.example.com"
+SMTP_PORT="587"
+SMTP_USERNAME="your@email.com"
+SMTP_PASSWORD="your-password"
+SMTP_FROM_EMAIL="your@email.com"
+REPORT_TO_EMAIL="team@email.com"
 ```
-
-## Demo Portfolio Data
-
-To create a portfolio-friendly demo dataset:
-
-```bash
-python3 scripts/seed_demo.py
-```
-
-Use this for screenshots, curriculum demos, and recruiter walkthroughs. Keep real operational data separate.
 
 ## Project Structure
 
 ```txt
-content_automation_platform/
-├── app.py
-├── requirements.txt
-├── data/
-│   └── scheduler.db
-├── content_platform/
-│   ├── __init__.py
-│   ├── database.py
-│   ├── models.py
-│   ├── routes.py
-│   └── services/
-│       ├── analytics.py
-│       ├── publisher.py
-│       └── scheduler.py
-├── static/
-│   └── styles.css
-└── templates/
-    ├── base.html
-    ├── dashboard.html
-    ├── logs.html
-    ├── post_form.html
-    └── posts.html
+content_platform/
+├── auth.py
+├── database.py
+├── models.py
+├── routes.py
+├── security.py
+└── services/
+    ├── analytics.py
+    ├── media.py
+    ├── media_optimizer.py
+    ├── platform_publishers.py
+    ├── publisher.py
+    ├── reporting.py
+    ├── rss.py
+    ├── rss_groups.py
+    ├── scheduler.py
+    ├── schedules.py
+    └── social_accounts.py
 ```
 
-## Future Expansion
+## Recruiter Summary
 
-- Instagram, Facebook, LinkedIn, X, Threads, Bluesky, TikTok, and YouTube API integrations
-- Retry system for failed publications
-- AI-generated titles, captions, and hashtags
-- Dashboard monthly calendar view
-- Inline calendar editing with a compact pop-up editor
-- Quick-edit calendar menu for changing a post title, platform, status, and schedule without leaving the month view
-- Drag-and-drop calendar rescheduling for post schedules
-- Analytics for best day, best hour, and platform frequency
-- One-click option to attach the source article image directly to selected post versions
-- Persistent media storage through Supabase Storage or S3
+This project demonstrates:
+
+- Python backend development
+- Flask web application design
+- SQL data modeling
+- CRUD workflows
+- RSS automation
+- job scheduling
+- state management
+- API integrations
+- encrypted credential storage
+- file upload validation
+- media optimization
+- security hardening
+- deployment planning with Render and Supabase
+
+## Roadmap
+
+- Finish Instagram publishing with feed, reels, stories, and video validation
+- Finish Threads OAuth/user-token flow
+- Add verification buttons for every API account
+- Add retry/backoff queue for scheduled publishing
+- Add analytics for best day/hour/platform
+- Add AI-assisted copy, titles, and hashtags
+- Add a dedicated demo mode for portfolio/recruiter walkthroughs

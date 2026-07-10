@@ -1,201 +1,72 @@
 # Final Presentation Cheatsheet
 
-## 1. Frase de abertura
+Este ficheiro e para memorizar rapidamente antes de apresentar.
 
-Este projeto e uma Content Automation Platform em Python e Flask.
+## 1. Pitch de 20 segundos
 
-O objetivo nao e apenas agendar posts. O objetivo e automatizar parte do workflow de conteudo:
+> O meu projeto e uma Content Automation Platform em Python e Flask. Permite gerir posts para varias redes sociais, importar artigos por RSS, adaptar versoes por plataforma, anexar media, agendar, reciclar conteudo, publicar por API e consultar logs.
 
-```txt
-descobrir conteudo
-criar drafts
-escolher plataforma
-escolher formato
-anexar media
-agendar
-reciclar
-processar queue
-registar logs
-enviar report
-```
+## 2. Pitch de 1 minuto
 
-Se te perguntarem em linguagem simples:
+> A ideia nasceu de um problema real: gerir conteudo para varias redes sociais e repetitivo e facil de perder controlo. Por isso criei uma plataforma web que centraliza o workflow. A app importa artigos de RSS como drafts, permite adaptar o copy e formato para cada rede, aceita imagens e videos, agenda publicacoes, recicla posts evergreen e regista logs. Localmente corre com SQLite e em producao pode correr em Render com Supabase/Postgres e Supabase Storage.
 
-> E uma ferramenta para gerir publicacoes em varias redes sociais, com automacao de RSS, agendamento, reciclagem de posts e reporting.
+## 3. Frase chave
 
-## 2. Problema que o projeto resolve
+> Nao e apenas um scheduler. E uma plataforma de automacao de conteudo.
 
-Gerir conteudo em muitas plataformas e repetitivo.
-
-Cada rede social tem formatos diferentes:
-
-- Instagram tem Story, Reel, Carousel;
-- X tem posts, threads e link commentary;
-- Bluesky e mais texto-first;
-- TikTok e YouTube Shorts sao video-first.
-
-Sem uma plataforma central, e facil perder:
-
-- o que esta em draft;
-- o que esta agendado;
-- o que ja foi publicado;
-- quais posts podem ser reutilizados;
-- que conteudo novo veio de RSS.
-
-## 3. Funcionalidades principais
-
-### Posts
-
-Permite criar, editar, apagar e listar posts.
-
-Cada post tem:
-
-- titulo;
-- conteudo;
-- hashtags;
-- plataforma;
-- formato;
-- estado;
-- media;
-- data principal;
-- datas de reciclagem.
-
-### Plataformas
-
-Suporta:
-
-- Instagram;
-- Facebook;
-- LinkedIn;
-- X;
-- Threads;
-- Bluesky;
-- YouTube Shorts;
-- TikTok.
-
-### Formatos
-
-Cada plataforma tem formatos proprios.
-
-Exemplo:
+## 4. Workflow principal
 
 ```txt
-Instagram -> Feed Post, Carousel, Reel, Story, Video Post
-X -> Text Post, Thread, Image Post, Video Post, Link Commentary
-Bluesky -> Text Post, Thread, Image Post, Video Post
+RSS ou post manual
+-> draft
+-> escolher redes
+-> adaptar copy/formato
+-> media
+-> schedule
+-> queue
+-> publish
+-> logs
 ```
 
-Isto mostra que o projeto nao trata todas as redes como iguais.
+## 5. Funcionalidades para mencionar
 
-### Media
+- Login protegido
+- Dashboard
+- Biblioteca de posts
+- Filtros e ordenacao
+- RSS intake
+- Editor agrupado por artigo
+- General defaults + overrides por rede
+- Upload de imagens e videos
+- Compressao de media
+- Scheduling
+- Reciclagem de posts
+- Calendario mensal
+- Logs
+- Email report
+- API Accounts
+- Publicacao real em Bluesky e Facebook
 
-Aceita imagens e videos.
+## 6. Arquitetura em frase simples
 
-Formatos aceites:
+> Separei o codigo em rotas, modelos, base de dados e services. Assim, cada parte tem uma responsabilidade clara.
 
-- PNG;
-- JPG/JPEG;
-- GIF;
-- WEBP;
-- MP4;
-- MOV;
-- M4V;
-- WEBM.
+Explicacao rapida:
 
-### RSS intake
+- `routes.py`: paginas Flask.
+- `models.py`: plataformas, formatos e limites.
+- `database.py`: SQLite/Postgres.
+- `scheduler.py`: CRUD de posts.
+- `rss.py`: feeds RSS.
+- `media.py`: uploads.
+- `media_optimizer.py`: compressao.
+- `publisher.py`: fila e estado de publicacao.
+- `platform_publishers.py`: APIs reais.
+- `security.py`: CSRF e headers.
 
-A area RSS e privada.
+## 7. Base de dados
 
-O sistema le feeds RSS e transforma itens novos em posts `Draft`.
-
-Isto e util porque permite automatizar a descoberta de conteudo, mas manter revisao humana antes da publicacao.
-
-### Reciclagem de posts
-
-Um post pode ter varias datas de agendamento.
-
-Assim, nao e preciso duplicar manualmente o mesmo conteudo.
-
-### Reports por email
-
-Existe um script que gera um report com:
-
-- contadores do dashboard;
-- proximos posts;
-- schedules reciclados;
-- plataformas;
-- logs recentes.
-
-## 4. Arquitetura
-
-O projeto esta organizado por responsabilidades.
-
-```txt
-content_platform/
-├── auth.py
-├── database.py
-├── models.py
-├── routes.py
-├── security.py
-└── services/
-    ├── analytics.py
-    ├── media.py
-    ├── publisher.py
-    ├── reporting.py
-    ├── rss.py
-    ├── scheduler.py
-    └── schedules.py
-```
-
-### Como explicar cada parte
-
-`routes.py`
-
-> Define as paginas e endpoints da aplicacao.
-
-`models.py`
-
-> Define plataformas, estados e formatos permitidos.
-
-`database.py`
-
-> Cria e inicializa a base de dados SQLite.
-
-`scheduler.py`
-
-> Gere posts: criar, editar, listar, apagar e procurar posts vencidos.
-
-`schedules.py`
-
-> Gere multiplas datas para reciclagem de posts.
-
-`publisher.py`
-
-> Simula o processamento da queue. No futuro, seria aqui que entram APIs reais.
-
-`rss.py`
-
-> Le feeds RSS e transforma itens novos em drafts.
-
-`media.py`
-
-> Gere uploads e validacao de imagens/videos.
-
-`reporting.py`
-
-> Gera e envia reports por email.
-
-`security.py`
-
-> Centraliza CSRF e headers de seguranca.
-
-`auth.py`
-
-> Protege a area RSS com login de admin.
-
-## 5. Base de dados
-
-Tabelas principais:
+Tabelas:
 
 ```txt
 posts
@@ -204,88 +75,69 @@ post_schedules
 rss_feeds
 rss_items
 logs
+social_accounts
 ```
 
-Como explicar:
+Frase:
 
-> Separei posts, media, schedules, feeds RSS e logs em tabelas diferentes para evitar misturar responsabilidades e para conseguir evoluir o sistema.
+> Separei posts, media, schedules, RSS, logs e credenciais para evitar duplicacao e permitir evoluir o sistema.
 
-## 6. Segurança
+## 8. Seguranca
 
-Pontos implementados:
+Pontos:
 
-- queries parametrizadas contra SQL injection;
-- CSRF em formularios POST;
-- headers de seguranca;
-- login na area RSS;
-- validacao de plataforma/estado/formato;
-- limites de tamanho em campos;
-- validacao de uploads por extensao e assinatura;
-- nomes de ficheiro gerados por UUID;
-- protecao contra path traversal ao apagar media.
+- Login
+- CSRF
+- queries parametrizadas
+- validacao de input
+- validacao de uploads
+- UUID nos ficheiros
+- headers de seguranca
+- credenciais encriptadas
+- secrets fora do GitHub
 
-Frase para usar:
+Frase:
 
-> Mesmo sendo um MVP academico, tentei aplicar praticas de seguranca reais: CSRF, validacao de input, queries parametrizadas e controlo de uploads.
+> Mesmo sendo MVP, tentei tratar seguranca como trataria numa app real.
 
-## 7. O que ainda nao e producao completa
+## 9. API publishing
 
-Ser honesta aqui conta pontos.
+Estado:
 
-Ainda faltaria:
+- Bluesky: funciona.
+- Facebook: funciona para feed/link/imagem/video.
+- Facebook Stories/Reels: bloqueados ate implementar endpoints especificos.
+- Instagram/Threads: estrutura pronta, em fase de credenciais e testes.
+- X: roadmap/manual por limitacoes do plano/API.
 
-- login por utilizador individual;
-- permissoes por equipa;
-- HTTPS no deploy;
-- storage externo para uploads;
-- migrar para Postgres se for para equipa;
-- testes automatizados permanentes;
-- APIs reais das redes sociais.
+Frase:
 
-Frase boa:
+> Cada rede tem regras diferentes. Por isso a app valida formato e media antes de publicar, para evitar publicacoes erradas.
 
-> Esta versao esta pronta como MVP funcional. Para producao real, eu evoluiria autenticacao, base de dados, storage e integracoes externas.
+## 10. Demo rapida
 
-## 8. Demo sugerida
+1. Dashboard.
+2. Posts.
+3. Abrir artigo RSS agrupado.
+4. Mostrar General tab.
+5. Mostrar override numa rede.
+6. Mostrar media/preview.
+7. Mostrar calendario/schedules.
+8. Mostrar API Accounts.
+9. Mostrar Logs.
 
-1. Abrir dashboard.
-2. Mostrar contadores.
-3. Criar post Instagram Story ou Reel.
-4. Adicionar media.
-5. Criar post X Thread.
-6. Mostrar filtros.
-7. Mostrar datas recicladas.
-8. Entrar na area RSS.
-9. Explicar que RSS cria drafts.
-10. Mostrar logs.
-11. Mostrar report dry-run:
+## 11. Se perguntarem "o que aprendeste?"
 
-```bash
-python3 scripts/send_dashboard_report.py --dry-run
-```
+Resposta:
 
-## 9. Perguntas provaveis
+> Aprendi a transformar um problema real num workflow automatizado. Trabalhei com Flask, base de dados, validacao, seguranca, uploads, APIs externas, deploy e limites reais das plataformas.
 
-### Porque Flask?
+## 12. Se perguntarem "o que falta?"
 
-Porque e simples, direto e bom para aprender backend, rotas, templates, formularios e arquitetura web.
+Resposta:
 
-### Porque SQLite?
+> Falta finalizar Instagram/Threads, adicionar retry/backoff mais robusto, analytics e testes automatizados. Mas a arquitetura ja foi pensada para isso.
 
-Porque e leve e suficiente para MVP/local/PythonAnywhere. Para equipa, migraria para Postgres.
+## 13. Fecho
 
-### Porque RSS?
-
-Porque automatiza a descoberta de conteudo. Em vez de procurar manualmente noticias, a app transforma novos artigos em drafts.
-
-### Porque nao publica diretamente nas redes?
-
-Porque esta fase foca o workflow e a automacao interna. Publicacao real exigiria APIs, tokens, permisssoes e politicas de cada plataforma.
-
-### O que mostra perfil de Automation Engineer?
-
-Mostra que identifiquei um processo repetitivo, modelei estados, criei uma queue, logs, RSS intake, reciclagem e reporting.
-
-## 10. Frase final
-
-Este projeto demonstra backend, base de dados, seguranca, automacao e pensamento de produto. Comecou como um scheduler, mas evoluiu para uma plataforma de content operations com RSS intake, queue, reciclagem e reports.
+> Este projeto mostra backend, automacao, produto e capacidade de evoluir uma ideia academica para uma ferramenta real.
