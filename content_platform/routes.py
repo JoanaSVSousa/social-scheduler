@@ -883,6 +883,18 @@ def _verify_facebook_account(credentials):
         "Facebook Page lookup",
     )
     details = [f"Page {page.get('name') or page.get('id')} is readable"]
+    token_owner = _meta_get_json(
+        "https://graph.facebook.com/v20.0/me",
+        {"fields": "id,name", "access_token": access_token},
+        "Facebook token owner lookup",
+    )
+    if str(token_owner.get("id", "")) != str(page_id):
+        raise RuntimeError(
+            "Token can read the page, but /me identifies it as "
+            f"{token_owner.get('name') or token_owner.get('id')}, not the Facebook Page ID {page_id}. "
+            "Use the Page Access Token returned inside GET /me/accounts for Squared Potato."
+        )
+    details.append("token owner matches the page")
     scopes = _meta_token_scopes(credentials)
     if not scopes:
         raise RuntimeError(
