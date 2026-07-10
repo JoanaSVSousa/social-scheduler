@@ -41,6 +41,7 @@ The goal is not just to store posts. The goal is to model a real automation work
 - Real API publishing for Bluesky and Facebook feed/photo/video posts
 - Credential storage encrypted at rest
 - API account verification for Meta/Facebook and Instagram credentials
+- Long-lived Meta Page token helpers for Facebook and Instagram to reduce manual token replacement
 
 ## Platform Status
 
@@ -180,6 +181,41 @@ Images are optimized before API upload when needed.
 Videos are currently accepted as MP4 and are not transcoded during the web request. This keeps Render workers responsive while still allowing Facebook/Meta video publishing through public Supabase Storage URLs. Heavier MOV/WEBM conversion should run later as a background job, not inside the save/publish button.
 
 For Meta APIs, uploaded media must have a public URL. In production, this is handled through Supabase Storage.
+
+## Meta Token Workflow
+
+Graph API Explorer often gives short-lived user tokens. For daily team use, do not paste that user token directly as the publishing token. Facebook Page publishing and Instagram Graph publishing should use the Page token returned for the correct Facebook Page.
+
+Facebook recommended workflow:
+
+1. Save the Facebook Page ID, Meta App ID, and Meta App Secret in API Accounts.
+2. Add the OAuth callback shown in the Facebook card to the Meta app settings.
+3. Click `Connect Facebook`.
+
+The app opens Meta OAuth, receives the authorization code, exchanges it for a user token, fetches `/me/accounts`, selects the configured Page, stores the Page access token, and records the expiry information returned by Meta.
+
+Instagram recommended workflow:
+
+1. Save the Instagram Business ID and linked Facebook Page ID in API Accounts.
+2. Keep the Meta App ID and Meta App Secret saved in the Facebook card.
+3. Add the OAuth callback shown in the Instagram card to the Meta app settings.
+4. Click `Connect Instagram`.
+
+The app opens Meta OAuth with Instagram publishing scopes, exchanges the code, fetches the configured Facebook Page token, confirms that the Page is linked to the configured Instagram Business account, stores the token, and records the expiry information returned by Meta.
+
+Fallback workflow for Facebook or Instagram:
+
+1. Generate a short-lived user token in Graph API Explorer with:
+   - `pages_show_list`
+   - `pages_read_engagement`
+   - `pages_manage_posts`
+   - `instagram_basic` and `instagram_content_publish` when generating an Instagram publishing token
+2. Paste that temporary user token into the Facebook card.
+3. Click `Generate long-lived Page token`.
+
+For Instagram, paste the temporary token into the Instagram card and click `Generate Instagram long-lived token`.
+
+The fallback performs the same Page-token selection, but OAuth Connect is the preferred operational path. Tokens can still be invalidated by Meta if permissions change, the app is removed, the password is reset, or Meta security policy requires reauthorization.
 
 ## Email Dashboard Report
 

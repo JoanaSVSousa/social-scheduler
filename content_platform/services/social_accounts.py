@@ -25,7 +25,7 @@ STATUS_NEEDS_VERIFICATION = "Needs verification"
 
 SOCIAL_ACCOUNT_SCHEMAS = {
     "Instagram": {
-        "description": "Meta/Instagram publishing usually needs a professional IG account, a linked Facebook Page, and a long-lived access token.",
+        "description": "Meta/Instagram publishing needs a professional IG account, its linked Facebook Page, and a long-lived Page access token. The Connect Instagram button can generate it from the Meta app credentials saved in Facebook.",
         "auth_options": [("meta_graph", "Meta Graph API")],
         "fields": [
             {"name": "instagram_business_id", "label": "Instagram Business ID", "placeholder": "1784...", "example": "Example: 17841400000000000"},
@@ -174,6 +174,28 @@ def save_social_account(platform, account_label, account_handle, auth_type, cred
         )
 
 
+def update_social_account_credentials(platform, credential_values, connection_status=STATUS_NEEDS_VERIFICATION):
+    existing = get_social_account(platform)
+    if not existing:
+        raise RuntimeError(f"{platform} credentials are not configured yet.")
+    credentials = _stored_credentials(existing, fail_closed=True)
+    credentials.update({key: value for key, value in credential_values.items() if value is not None})
+    encrypted_credentials = encrypt_credentials(credentials)
+    verified_at = datetime.now().strftime("%Y-%m-%dT%H:%M")
+    with get_connection() as conn:
+        conn.execute(
+            """
+            UPDATE social_accounts
+            SET encrypted_credentials = ?,
+                connection_status = ?,
+                last_verified_at = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE platform = ?
+            """,
+            (encrypted_credentials, connection_status, verified_at, platform),
+        )
+
+
 def delete_social_account(platform):
     with get_connection() as conn:
         conn.execute("DELETE FROM social_accounts WHERE platform = ?", (platform,))
@@ -191,6 +213,15 @@ def public_credential_values(account):
         field: credentials.get(field, "")
         for field in credential_field_names(account["platform"])
         if field in public_fields
+    }
+
+
+def credential_metadata(account):
+    credentials = _stored_credentials(account)
+    return {
+        "token_expires_at": credentials.get("token_expires_at", ""),
+        "token_expires_label": credentials.get("token_expires_label", ""),
+        "token_source": credentials.get("token_source", ""),
     }
 
 
