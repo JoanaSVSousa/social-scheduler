@@ -736,6 +736,29 @@ def save_social_account_settings(platform):
     return redirect(url_for("main.social_account_settings"))
 
 
+@bp.post("/settings/social-accounts/<platform>/verify")
+@login_required
+def verify_social_account_settings(platform):
+    validate_csrf()
+    if platform not in PLATFORMS:
+        abort(404)
+
+    account = decrypt_credentials_for_publisher(platform)
+    if not account:
+        flash(f"{platform} credentials are not configured yet.", "warning")
+        return redirect(url_for("main.social_account_settings"))
+
+    try:
+        message = _verify_social_account(account)
+    except RuntimeError as exc:
+        add_log(None, "ERROR", f"{platform} credential verification failed: {exc}")
+        flash(f"{platform} verification failed: {exc}", "warning")
+    else:
+        add_log(None, "SUCCESS", f"{platform} credential verification passed: {message}")
+        flash(f"{platform} verification passed: {message}", "success")
+    return redirect(url_for("main.social_account_settings"))
+
+
 @bp.post("/settings/social-accounts/Threads/connect")
 @login_required
 def connect_threads_account():
@@ -832,6 +855,101 @@ def _exchange_threads_authorization_code(app_id, app_secret, code, redirect_uri)
         raise RuntimeError(f"Threads token exchange failed {exc.code}: {detail[:400]}") from exc
     except (URLError, TimeoutError, ValueError, json.JSONDecodeError) as exc:
         raise RuntimeError(f"Threads token exchange failed: {exc}") from exc
+
+
+def _verify_social_account(account):
+    platform = account["platform"]
+    credentials = account["credentials"]
+    if platform == "Facebook":
+        return _verify_facebook_account(credentials)
+    if platform == "Instagram":
+        return _verify_instagram_account(credentials)
+    raise RuntimeError("Credential verification is currently available for Facebook and Instagram.")
+
+
+def _verify_facebook_account(credentials):
+    page_id = credentials.get("page_id", "")
+    access_token = credentials.get("access_token", "")
+    if not page_id or not access_token:
+        raise RuntimeError("Facebook needs Page ID and Page Access Token.")
+
+    page = _meta_get_json(
+        f"https://graph.facebook.com/v20.0/{page_id}",
+        {"fields": "id,name", "access_token": access_token},
+        "Facebook Page lookup",
+    )
+    details = [f"Page {page.get('name') or page.get('id')} is readable"]
+    scopes = _meta_token_scopes(credentials)
+    missing_scopes = [scope for scope in ["pages_read_engagement", "pages_manage_posts"] if scope not in scopes]
+    if scopes and missing_scopes:
+        raise RuntimeError(f"Token is readable, but missing scopes: {', '.join(missing_scopes)}.")
+    if scopes:
+        details.append("publish scopes are present")
+    else:
+        details.append("scope check skipped because App ID/App Secret are not saved")
+    return "; ".join(details) + "."
+
+
+def _verify_instagram_account(credentials):
+    instagram_id = credentials.get("instagram_business_id", "")
+    access_token = credentials.get("access_token", "")
+    if not instagram_id or not access_token:
+        raise RuntimeError("Instagram needs Instagram Business ID and Access Token.")
+
+    account = _meta_get_json(
+        f"https://graph.facebook.com/v20.0/{instagram_id}",
+        {"fields": "id,username", "access_token": access_token},
+        "Instagram account lookup",
+    )
+    return f"Instagram account {account.get('username') or account.get('id')} is readable."
+
+
+def _meta_token_scopes(credentials):
+    app_id = credentials.get("app_id", "")
+    app_secret = credentials.get("app_secret", "")
+    access_token = credentials.get("access_token", "")
+    if not app_id or not app_secret or not access_token:
+        return []
+    payload = _meta_get_json(
+        "https://graph.facebook.com/debug_token",
+        {"input_token": access_token, "access_token": f"{app_id}|{app_secret}"},
+        "Meta token debug",
+    )
+    data = payload.get("data") or {}
+    scopes = set(data.get("scopes") or [])
+    for granular_scope in data.get("granular_scopes") or []:
+        scope = granular_scope.get("scope")
+        if scope:
+            scopes.add(scope)
+    if data.get("is_valid") is False:
+        raise RuntimeError("Meta says this access token is not valid.")
+    return scopes
+
+
+def _meta_get_json(url, params, endpoint_name):
+    request_url = f"{url}?{urlencode(params)}"
+    try:
+        with urlopen(Request(request_url, method="GET"), timeout=20) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"{endpoint_name} error {exc.code}: {_clean_meta_error(detail)}") from exc
+    except (URLError, TimeoutError, ValueError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"{endpoint_name} failed: {exc}") from exc
+
+
+def _clean_meta_error(detail):
+    try:
+        payload = json.loads(detail)
+    except json.JSONDecodeError:
+        return detail[:400]
+    error = payload.get("error") or payload
+    pieces = [str(error.get("message") or "Unknown Meta API error")]
+    if error.get("code"):
+        pieces.append(f"code {error['code']}")
+    if error.get("error_subcode"):
+        pieces.append(f"subcode {error['error_subcode']}")
+    return " ".join(pieces)
 
 
 @bp.post("/settings/social-accounts/<platform>/delete")

@@ -184,11 +184,24 @@ def credential_field_names(platform):
 
 def _normalize_credential_value(platform, field_name, value):
     value = (value or "").strip()
+    if platform == "Facebook" and field_name == "page_id":
+        return _first_numeric_id(value)
+    if platform == "Instagram" and field_name in {"instagram_business_id", "facebook_page_id"}:
+        return _first_numeric_id(value)
+    if platform == "Threads" and field_name in {"app_id", "threads_user_id"}:
+        return _first_numeric_id(value)
     if platform == "Bluesky" and field_name == "pds_url":
         normalized = value.lower().rstrip("/")
         if normalized in {"", "bsky.app", "www.bsky.app", "https://bsky.app", "https://www.bsky.app"}:
             return "https://bsky.social"
     return value
+
+
+def _first_numeric_id(value):
+    if not value:
+        return ""
+    digits = "".join(character if character.isdigit() else " " for character in value).split()
+    return max(digits, key=len) if digits else value.strip()
 
 
 def decrypt_credentials_for_publisher(platform):

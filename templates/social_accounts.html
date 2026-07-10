@@ -40,7 +40,7 @@
                         <input name="account_label" maxlength="120" value="{{ account.account_label if account else '' }}" placeholder="Squared Potato">
                     </label>
                     <label>
-                        Handle / page
+                        Handle / page label
                         <input name="account_handle" maxlength="120" value="{{ account.account_handle if account else '' }}" placeholder="@squaredpotato">
                     </label>
                 </div>
@@ -85,6 +85,13 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <p class="field-help">OAuth callback URL for Meta: {{ url_for('main.threads_oauth_callback', _external=True) }}</p>
                 <button class="button primary" type="submit">Connect Threads</button>
+            </form>
+            {% endif %}
+            {% if platform in ["Facebook", "Instagram"] and account %}
+            <form method="post" action="{{ url_for('main.verify_social_account_settings', platform=platform) }}" class="social-account-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <p class="field-help">Checks whether the saved token can read this Meta account before publishing.</p>
+                <button class="button" type="submit">Verify credentials</button>
             </form>
             {% endif %}
             {% if account %}

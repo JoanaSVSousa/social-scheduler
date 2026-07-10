@@ -104,10 +104,12 @@ def publish_to_facebook(post, media_items):
         raise PublicationError("Facebook credentials are not configured.")
 
     credentials = account["credentials"]
-    page_id = credentials.get("page_id") or account.get("account_handle")
+    page_id = credentials.get("page_id")
     access_token = credentials.get("access_token")
     if not page_id or not access_token:
         raise PublicationError("Facebook needs a Page ID and a Page access token with publishing permissions.")
+    if not page_id.isdigit():
+        raise PublicationError("Facebook Page ID must be numeric. Re-save the Facebook account with only the page number in Page ID.")
     text = compose_publication_text("Facebook", post["content"], post["hashtags"])
     if not text:
         raise PublicationError("Post content is empty. The title is internal and is not published.")
