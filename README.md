@@ -37,7 +37,7 @@ The goal is not just to store posts. The goal is to model a real automation work
 - Supabase/Postgres support for production
 - Supabase Storage support for public media URLs
 - Image compression for API limits
-- Video upload validation and MP4 compression/conversion pipeline
+- MP4 video upload validation for API publishing
 - Real API publishing for Bluesky and Facebook feed/photo/video posts
 - Credential storage encrypted at rest
 - API account verification for Meta/Facebook and Instagram credentials
@@ -64,7 +64,7 @@ The goal is not just to store posts. The goal is to model a real automation work
 - Supabase Storage for public media assets
 - HTML, Jinja templates, CSS, and vanilla JavaScript
 - Pillow for image optimization
-- imageio-ffmpeg/ffmpeg for video conversion and compression
+- imageio-ffmpeg/ffmpeg scaffold for future background video conversion
 - Gunicorn on Render
 
 Production is pinned to Python 3.12 through `.python-version`, `runtime.txt`, and `PYTHON_VERSION` in `render.yaml`.
@@ -106,7 +106,7 @@ SUPABASE_SERVICE_ROLE_KEY="server-only-service-role-key"
 SUPABASE_MEDIA_BUCKET="social-media"
 ```
 
-Optional video fallback:
+Optional future video-processing fallback:
 
 ```bash
 FFMPEG_BINARY="/usr/bin/ffmpeg"
@@ -174,13 +174,10 @@ Accepted upload formats:
 - GIF
 - WEBP
 - MP4
-- MOV
-- M4V
-- WEBM
 
 Images are optimized before API upload when needed.
 
-Videos are converted/compressed to MP4 for safer publishing. The compressed version replaces the uploaded version, so the app does not keep duplicate heavy files.
+Videos are currently accepted as MP4 and are not transcoded during the web request. This keeps Render workers responsive while still allowing Facebook/Meta video publishing through public Supabase Storage URLs. Heavier MOV/WEBM conversion should run later as a background job, not inside the save/publish button.
 
 For Meta APIs, uploaded media must have a public URL. In production, this is handled through Supabase Storage.
 

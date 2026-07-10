@@ -31,9 +31,7 @@ def prepare_media_for_publish(media_items, image_limit_bytes=DEFAULT_IMAGE_LIMIT
                 item["publish_path"] = optimized["path"]
                 item["publish_content_type"] = optimized["content_type"]
         elif item["media_type"] == "video":
-            path = _replace_with_optimized_video(item, path)
-            item["publish_path"] = path
-            item["publish_content_type"] = _content_type_for_path(path)
+            item["publish_content_type"] = "video/mp4"
 
         if item.get("optimization_failed"):
             item["public_url"] = ""
@@ -42,50 +40,6 @@ def prepare_media_for_publish(media_items, image_limit_bytes=DEFAULT_IMAGE_LIMIT
 
         prepared.append(item)
     return prepared
-
-
-def _replace_with_optimized_video(item, path):
-    try:
-        needs_optimization = path.suffix.lower() != ".mp4" or path.stat().st_size > DEFAULT_VIDEO_LIMIT_BYTES
-    except OSError:
-        item["optimization_failed"] = True
-        return path
-
-    optimized = optimize_video_file(path)
-    if not optimized:
-        if needs_optimization:
-            item["optimization_failed"] = True
-        return path
-
-    optimized_path = optimized["path"]
-    if optimized_path == path:
-        return path
-
-    target_path = path if path.suffix.lower() == ".mp4" else path.with_suffix(".mp4")
-    if target_path != path and target_path.exists():
-        target_path.unlink()
-    if path.exists():
-        path.unlink()
-    optimized_path.replace(target_path)
-
-    updates = {"public_url": ""}
-    if target_path.name != item["filename"]:
-        updates["filename"] = target_path.name
-        item["filename"] = target_path.name
-    item["public_url"] = ""
-    _update_media_item(item["id"], updates)
-    return target_path
-
-
-def _update_media_item(media_id, values):
-    if not values:
-        return
-    assignments = ", ".join(f"{key} = ?" for key in values)
-    with get_connection() as conn:
-        conn.execute(
-            f"UPDATE media_assets SET {assignments} WHERE id = ?",
-            (*values.values(), media_id),
-        )
 
 
 def _ensure_public_url(media_item, path):

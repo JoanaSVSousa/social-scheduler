@@ -60,7 +60,7 @@ Camadas de protecao:
 - limite de tamanho;
 - nomes finais por UUID;
 - `secure_filename` para nome original;
-- conversao/compressao de videos para MP4;
+- validacao de videos MP4;
 - compressao de imagens quando necessario;
 - remocao segura com path validation.
 
@@ -70,10 +70,7 @@ Formatos aceites:
 - JPG/JPEG;
 - GIF;
 - WEBP;
-- MP4;
-- MOV;
-- M4V;
-- WEBM.
+- MP4.
 
 ### Media publishing guard rails
 
@@ -138,4 +135,4 @@ A app envia:
 
 ## Frase para aula/recrutador
 
-> Para alem das funcionalidades, pensei na seguranca: login, CSRF, queries parametrizadas, validacao de input, upload seguro, compressao de media, headers de seguranca e credenciais de API encriptadas. Isto mostra que tratei o projeto como uma aplicacao real.
+> Para alem das funcionalidades, pensei na seguranca: login, CSRF, queries parametrizadas, validacao de input, upload seguro, compressao de imagens, validacao de videos, headers de seguranca e credenciais de API encriptadas. Isto mostra que tratei o projeto como uma aplicacao real.

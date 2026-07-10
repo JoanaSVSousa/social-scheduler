@@ -102,11 +102,11 @@ Como explicar:
 
 Como explicar:
 
-> A app aceita imagens e videos, valida tipos de ficheiro, usa nomes seguros, comprime imagens e converte/comprime videos para MP4 quando necessario.
+> A app aceita imagens e videos, valida tipos de ficheiro, usa nomes seguros, comprime imagens quando necessario e aceita videos MP4 para publicacao por API.
 
 Detalhe importante:
 
-> Para poupar servidor e storage, fica guardada a versao comprimida do video, nao o original pesado mais uma copia.
+> Para manter o Render estavel, a app nao tenta converter videos dentro do pedido web. Conversao pesada de MOV/WEBM para MP4 fica pensada para um job de fundo.
 
 ### Publicacao por API
 
@@ -159,7 +159,7 @@ Como explicar cada ficheiro:
 - `publisher.py`: fila de publicacao e controlo de estados.
 - `platform_publishers.py`: integracoes com APIs externas.
 - `media.py`: upload, validacao e associacao de ficheiros.
-- `media_optimizer.py`: compressao de imagens e videos.
+- `media_optimizer.py`: compressao de imagens e base para processamento de video em background.
 - `security.py`: CSRF e headers de seguranca.
 
 ## 6. Base de dados

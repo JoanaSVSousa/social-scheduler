@@ -122,8 +122,8 @@
         </div>
         <label class="upload-box">
             Add images or videos
-            <input id="media-input" type="file" name="media_files" accept="image/*,video/*" multiple>
-            <span>Supported: PNG, JPG, WEBP, GIF, MP4, MOV, M4V, WEBM.</span>
+            <input id="media-input" type="file" name="media_files" accept="image/*,video/mp4" multiple>
+            <span>Supported: PNG, JPG, WEBP, GIF, MP4.</span>
         </label>
 
         {% if media %}
@@ -255,9 +255,9 @@ function syncGuides() {
     if (allowedTypes.length === 1 && allowedTypes[0] === "image") {
         mediaInput.accept = "image/*";
     } else if (allowedTypes.length === 1 && allowedTypes[0] === "video") {
-        mediaInput.accept = "video/*";
+        mediaInput.accept = "video/mp4";
     } else {
-        mediaInput.accept = "image/*,video/*";
+        mediaInput.accept = "image/*,video/mp4";
     }
 }
 

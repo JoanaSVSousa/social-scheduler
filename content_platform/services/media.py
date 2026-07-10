@@ -9,9 +9,9 @@ from .public_media import PublicMediaError, upload_public_media
 
 
 UPLOAD_DIR = PROJECT_ROOT / "static" / "uploads"
-ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp", "mp4", "mov", "m4v", "webm"}
+ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp", "mp4"}
 IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
-VIDEO_EXTENSIONS = {"mp4", "mov", "m4v", "webm"}
+VIDEO_EXTENSIONS = {"mp4"}
 MAX_FILE_SIZE = 40 * 1024 * 1024
 
 
@@ -40,21 +40,11 @@ def save_media_files(post_id, files, content_format=""):
             skipped.append(f"{original_filename} ({content_format} does not accept {media_type} media)")
             continue
 
-        stored_extension = "mp4" if media_type == "video" else extension
-        filename = f"{uuid4().hex}.{stored_extension}"
+        filename = f"{uuid4().hex}.{extension}"
         path = UPLOAD_DIR / filename
         public_url = ""
         try:
             file.save(path)
-            if media_type == "video":
-                from .media_optimizer import optimize_video_file
-
-                optimized = optimize_video_file(path, force=extension != "mp4")
-                if not optimized:
-                    raise RuntimeError("video could not be compressed")
-                if optimized["path"] != path:
-                    path.unlink(missing_ok=True)
-                    optimized["path"].replace(path)
             public_url = upload_public_media(path, f"posts/{post_id}/{filename}")
             with get_connection() as conn:
                 conn.execute(
@@ -163,9 +153,7 @@ def _safe_upload_result(file, extension):
         return header.startswith((b"GIF87a", b"GIF89a")), "invalid GIF file"
     if extension == "webp":
         return header.startswith(b"RIFF") and header[8:12] == b"WEBP", "invalid WEBP file"
-    if extension == "webm":
-        return header.startswith(b"\x1a\x45\xdf\xa3"), "invalid WEBM file"
-    if extension in {"mp4", "mov", "m4v"}:
-        return b"ftyp" in header, "invalid MP4/MOV file"
+    if extension == "mp4":
+        return b"ftyp" in header, "invalid MP4 file"
 
     return False, "unsupported file type"

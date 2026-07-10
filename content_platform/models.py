@@ -44,7 +44,7 @@ FORMAT_MEDIA_GUIDES = {
         "Carousel": "Attach multiple images/videos in sequence. Keep the first slide strong.",
         "Reel": "Use vertical 9:16 video. Short, direct, and motion-led.",
         "Story": "Use vertical 9:16 image or video. Designed for temporary, quick updates.",
-        "Video Post": "Use MP4/MOV. Square, portrait, or vertical video works depending on goal.",
+        "Video Post": "Use MP4. Square, portrait, or vertical video works depending on goal.",
     },
     "Bluesky": {
         "Text Post": "Media optional. Keep the message concise and clear.",

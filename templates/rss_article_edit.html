@@ -168,7 +168,7 @@
                 </div>
                 <label class="upload-box">
                     Upload media for all networks
-                    <input data-general-media-input type="file" name="general_media_files" multiple accept="image/*,video/*">
+                    <input data-general-media-input type="file" name="general_media_files" multiple accept="image/*,video/mp4">
                     <span>Use network tabs only when one platform needs a different asset.</span>
                 </label>
                 <div class="media-strip" data-general-media-list></div>
@@ -348,7 +348,7 @@
                     type="file"
                     name="{{ prefix }}media_files"
                     multiple
-                    accept="{% if current_allowed == ['image'] %}image/*{% elif current_allowed == ['video'] %}video/*{% else %}image/*,video/*{% endif %}"
+                    accept="{% if current_allowed == ['image'] %}image/*{% elif current_allowed == ['video'] %}video/mp4{% else %}image/*,video/mp4{% endif %}"
                 >
                 <span>Images and videos attached here only apply to this network version.</span>
             </label>
@@ -681,9 +681,9 @@ document.querySelectorAll("[data-version-card]").forEach((card) => {
         if (allowedTypes.length === 1 && allowedTypes[0] === "image") {
             mediaInput.accept = "image/*";
         } else if (allowedTypes.length === 1 && allowedTypes[0] === "video") {
-            mediaInput.accept = "video/*";
+            mediaInput.accept = "video/mp4";
         } else {
-            mediaInput.accept = "image/*,video/*";
+            mediaInput.accept = "image/*,video/mp4";
         }
     }
 

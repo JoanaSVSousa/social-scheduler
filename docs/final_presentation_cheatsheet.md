@@ -38,7 +38,7 @@ RSS ou post manual
 - Editor agrupado por artigo
 - General defaults + overrides por rede
 - Upload de imagens e videos
-- Compressao de media
+- Compressao de imagens e validacao de videos MP4
 - Scheduling
 - Reciclagem de posts
 - Calendario mensal
@@ -59,7 +59,7 @@ Explicacao rapida:
 - `scheduler.py`: CRUD de posts.
 - `rss.py`: feeds RSS.
 - `media.py`: uploads.
-- `media_optimizer.py`: compressao.
+- `media_optimizer.py`: compressao de imagens e base para processamento de video.
 - `publisher.py`: fila e estado de publicacao.
 - `platform_publishers.py`: APIs reais.
 - `security.py`: CSRF e headers.
