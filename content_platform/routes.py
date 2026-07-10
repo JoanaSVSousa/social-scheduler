@@ -880,13 +880,14 @@ def _verify_facebook_account(credentials):
     )
     details = [f"Page {page.get('name') or page.get('id')} is readable"]
     scopes = _meta_token_scopes(credentials)
+    if not scopes:
+        raise RuntimeError(
+            "Page is readable, but publish scopes were not checked because Facebook App ID/App Secret are not saved in this Facebook card."
+        )
     missing_scopes = [scope for scope in ["pages_read_engagement", "pages_manage_posts"] if scope not in scopes]
     if scopes and missing_scopes:
         raise RuntimeError(f"Token is readable, but missing scopes: {', '.join(missing_scopes)}.")
-    if scopes:
-        details.append("publish scopes are present")
-    else:
-        details.append("scope check skipped because App ID/App Secret are not saved")
+    details.append("publish scopes are present")
     return "; ".join(details) + "."
 
 
