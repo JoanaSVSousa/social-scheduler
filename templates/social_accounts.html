@@ -15,6 +15,7 @@
         {% for platform in platforms %}
         {% set account = social_accounts.get(platform) %}
         {% set summary = social_credential_summaries.get(platform, {}) %}
+        {% set public_credentials = social_public_credentials.get(platform, {}) %}
         {% set schema = social_account_schemas.get(platform) %}
         <details class="social-account-card">
             <summary class="social-account-header">
@@ -58,10 +59,11 @@
                     <label data-auth-field data-auth-types="{{ field.get('auth_types', [])|join(',') }}">
                         {{ field.label }}
                         <input
-                            type="password"
+                            type="{% if field.name in public_credentials %}text{% else %}password{% endif %}"
                             name="{{ field.name }}"
                             autocomplete="off"
-                            placeholder="{% if summary.get(field.name) %}Saved - leave blank to keep{% else %}{{ field.placeholder }}{% endif %}"
+                            value="{{ public_credentials.get(field.name, '') }}"
+                            placeholder="{% if summary.get(field.name) and field.name not in public_credentials %}Saved - leave blank to keep{% else %}{{ field.placeholder }}{% endif %}"
                         >
                         {% if field.example %}
                         <span class="field-help">{{ field.example }}</span>

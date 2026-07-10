@@ -70,6 +70,7 @@ from .services.social_accounts import (
     credential_summary,
     delete_social_account,
     decrypt_credentials_for_publisher,
+    public_credential_values,
     save_social_account,
     social_accounts_by_platform,
 )
@@ -110,6 +111,9 @@ def social_account_settings():
         social_accounts=social_accounts,
         social_credential_summaries={
             platform: credential_summary(account) for platform, account in social_accounts.items()
+        },
+        social_public_credentials={
+            platform: public_credential_values(account) for platform, account in social_accounts.items()
         },
         social_account_schemas=SOCIAL_ACCOUNT_SCHEMAS,
         platforms=PLATFORMS,

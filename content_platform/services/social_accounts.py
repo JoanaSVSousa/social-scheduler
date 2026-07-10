@@ -10,6 +10,16 @@ from ..database import get_connection
 
 
 PUBLIC_FIELDS = ["account_label", "account_handle", "auth_type"]
+PUBLIC_CREDENTIAL_FIELDS = {
+    "Facebook": {"page_id", "app_id"},
+    "Instagram": {"instagram_business_id", "facebook_page_id"},
+    "LinkedIn": {"organization_id"},
+    "X": {"api_key", "oauth2_client_id"},
+    "Threads": {"app_id", "threads_user_id"},
+    "Bluesky": {"identifier", "pds_url"},
+    "YouTube Shorts": {"channel_id", "client_id"},
+    "TikTok": {"client_key", "open_id"},
+}
 STATUS_CONNECTED = "Connected"
 STATUS_NEEDS_VERIFICATION = "Needs verification"
 
@@ -172,6 +182,16 @@ def delete_social_account(platform):
 def credential_summary(account):
     credentials = _stored_credentials(account)
     return {field: bool(credentials.get(field)) for field in credential_field_names(account["platform"])}
+
+
+def public_credential_values(account):
+    credentials = _stored_credentials(account)
+    public_fields = PUBLIC_CREDENTIAL_FIELDS.get(account["platform"], set())
+    return {
+        field: credentials.get(field, "")
+        for field in credential_field_names(account["platform"])
+        if field in public_fields
+    }
 
 
 def credential_schema_for_platform(platform):
