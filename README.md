@@ -196,14 +196,13 @@ The app opens Meta OAuth, receives the authorization code, exchanges it for a us
 
 Instagram recommended workflow:
 
-1. Save the Instagram Business ID and linked Facebook Page ID in API Accounts.
-2. Keep the Meta App ID and Meta App Secret saved in the Facebook card.
-3. Add the shared Meta OAuth callback shown in the Facebook/Instagram cards to the Meta app settings.
-4. Click `Connect Instagram`.
+1. Save the Instagram App ID and Instagram App Secret in the Instagram card.
+2. Add the Instagram OAuth callback shown in the Instagram card to the Instagram API login callback settings.
+3. Click `Connect Instagram`.
 
-The app opens Meta OAuth with Instagram publishing scopes, exchanges the code, fetches the configured Facebook Page token, confirms that the Page is linked to the configured Instagram Business account, stores the token, and records the expiry information returned by Meta.
+The app opens Instagram Login with `instagram_business_basic` and `instagram_business_content_publish`, exchanges the code, upgrades the token to a longer-lived Instagram token, saves the Instagram user ID, and records the expiry information returned by Meta.
 
-Production callback URL:
+Production shared Meta callback URL for Facebook:
 
 ```txt
 https://social-scheduler-u1we.onrender.com/settings/social-accounts/meta/callback
@@ -211,13 +210,19 @@ https://social-scheduler-u1we.onrender.com/settings/social-accounts/meta/callbac
 
 Add that exact URL, without a trailing slash, to the OAuth redirect URI allowlist for the Meta login product used by the app. In the Meta UI this is usually under `Facebook Login` / `Facebook Login for Business` settings as `Valid OAuth Redirect URIs`; the generic app authentication callback field in advanced settings is not enough by itself. The app domain should be `social-scheduler-u1we.onrender.com`.
 
+Production Instagram callback URL:
+
+```txt
+https://social-scheduler-u1we.onrender.com/settings/social-accounts/Instagram/callback
+```
+
 Fallback workflow for Facebook or Instagram:
 
 1. Generate a short-lived user token in Graph API Explorer with:
    - `pages_show_list`
    - `pages_read_engagement`
    - `pages_manage_posts`
-   - `instagram_basic` and `instagram_content_publish` when generating an Instagram publishing token
+   - Use the Instagram Login connect button for Instagram. Do not use the legacy `instagram_basic` or `instagram_content_publish` scopes if the Meta app reports them as invalid.
 2. Paste that temporary user token into the Facebook card.
 3. Click `Generate long-lived Page token`.
 

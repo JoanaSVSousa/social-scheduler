@@ -934,29 +934,24 @@ def connect_instagram_account():
     validate_csrf()
     account = decrypt_credentials_for_publisher("Instagram")
     credentials = (account or {}).get("credentials", {})
-    instagram_id = credentials.get("instagram_business_id", "")
-    page_id = credentials.get("facebook_page_id", "")
-    app_id, app_secret = _meta_app_credentials(credentials)
-    if not instagram_id or not page_id:
-        flash("Save Instagram Business ID and linked Facebook Page ID before connecting Instagram.", "warning")
-        return redirect(url_for("main.social_account_settings"))
+    app_id = credentials.get("app_id", "")
+    app_secret = credentials.get("app_secret", "")
     if not app_id or not app_secret:
-        flash("Save Meta App ID and App Secret in the Facebook card before connecting Instagram.", "warning")
+        flash("Save Instagram App ID and Instagram App Secret in the Instagram card before connecting Instagram.", "warning")
         return redirect(url_for("main.social_account_settings"))
 
     state = secrets.token_urlsafe(24)
-    session["meta_oauth_state"] = state
-    session["meta_oauth_platform"] = "Instagram"
-    redirect_uri = _external_oauth_url("main.meta_oauth_callback")
-    authorization_url = "https://www.facebook.com/v20.0/dialog/oauth?" + urlencode(
+    session["instagram_oauth_state"] = state
+    redirect_uri = _external_oauth_url("main.instagram_oauth_callback")
+    authorization_url = "https://www.instagram.com/oauth/authorize?" + urlencode(
         {
             "client_id": app_id,
             "redirect_uri": redirect_uri,
-            "scope": "pages_show_list,pages_read_engagement,instagram_basic,instagram_content_publish",
+            "scope": "instagram_business_basic,instagram_business_content_publish",
             "response_type": "code",
             "state": state,
-            "auth_type": "rerequest",
-            "return_scopes": "true",
+            "enable_fb_login": "0",
+            "force_authentication": "1",
         }
     )
     return redirect(authorization_url)
@@ -981,22 +976,26 @@ def instagram_oauth_callback():
 def _complete_instagram_oauth_connection(code, redirect_uri):
     account = decrypt_credentials_for_publisher("Instagram")
     credentials = (account or {}).get("credentials", {})
-    instagram_id = credentials.get("instagram_business_id", "")
-    page_id = credentials.get("facebook_page_id", "")
-    app_id, app_secret = _meta_app_credentials(credentials)
-    if not instagram_id or not page_id or not app_id or not app_secret:
-        flash("Instagram Business ID, linked Facebook Page ID, App ID, or App Secret are missing.", "warning")
+    app_id = credentials.get("app_id", "")
+    app_secret = credentials.get("app_secret", "")
+    if not app_id or not app_secret:
+        flash("Instagram App ID or App Secret is missing. Save them and connect again.", "warning")
         return redirect(url_for("main.social_account_settings"))
 
     try:
-        token_payload = _exchange_facebook_authorization_code(app_id, app_secret, code, redirect_uri)
-        result = _generate_long_lived_instagram_page_token(
-            instagram_id=instagram_id,
-            page_id=page_id,
-            app_id=app_id,
-            app_secret=app_secret,
-            short_lived_user_token=token_payload["access_token"],
+        token_payload = _exchange_instagram_authorization_code(app_id, app_secret, code, redirect_uri)
+        short_lived_token = token_payload["access_token"]
+        user_id = str(token_payload.get("user_id") or "")
+        long_lived_payload = _exchange_instagram_long_lived_token(app_secret, short_lived_token)
+        access_token = long_lived_payload.get("access_token") or short_lived_token
+        expires_in = int(long_lived_payload.get("expires_in") or 0)
+        profile = _instagram_get_json(
+            "https://graph.instagram.com/v20.0/me",
+            {"fields": "id,username", "access_token": access_token},
+            "Instagram profile lookup",
         )
+        instagram_id = str(profile.get("id") or user_id)
+        expires_at = int(datetime.now(tz=timezone.utc).timestamp()) + expires_in if expires_in else 0
     except (KeyError, RuntimeError) as exc:
         add_log(None, "ERROR", f"Instagram OAuth connection failed: {exc}")
         flash(f"Instagram connection failed: {exc}", "warning")
@@ -1004,63 +1003,16 @@ def _complete_instagram_oauth_connection(code, redirect_uri):
         update_social_account_credentials(
             "Instagram",
             {
-                "access_token": result["page_access_token"],
-                "token_expires_at": result["token_expires_at"],
-                "token_expires_label": result["token_expires_label"],
-                "token_source": "OAuth long-lived Page token",
+                "instagram_business_id": instagram_id,
+                "access_token": access_token,
+                "token_expires_at": str(expires_at) if expires_at else "",
+                "token_expires_label": _format_meta_expiry(expires_at),
+                "token_source": "Instagram Login long-lived token",
             },
             connection_status=STATUS_CONNECTED,
         )
-        add_log(None, "SUCCESS", f"Instagram OAuth connected and Page token saved for IG ID {instagram_id}.")
-        flash(f"Instagram connected. Page token saved automatically. {result['token_expires_label']}", "success")
-    return redirect(url_for("main.social_account_settings"))
-
-
-@bp.post("/settings/social-accounts/Instagram/extend-token")
-@login_required
-def extend_instagram_page_token():
-    validate_csrf()
-    account = decrypt_credentials_for_publisher("Instagram")
-    credentials = (account or {}).get("credentials", {})
-    instagram_id = credentials.get("instagram_business_id", "")
-    page_id = credentials.get("facebook_page_id", "")
-    app_id, app_secret = _meta_app_credentials(credentials)
-    short_lived_user_token = request.form.get("short_lived_user_token", "").strip()
-
-    if not instagram_id or not page_id:
-        flash("Save Instagram Business ID and linked Facebook Page ID before generating an Instagram token.", "warning")
-        return redirect(url_for("main.social_account_settings"))
-    if not app_id or not app_secret:
-        flash("Save Meta App ID and App Secret in the Facebook card before generating an Instagram token.", "warning")
-        return redirect(url_for("main.social_account_settings"))
-    if not short_lived_user_token:
-        flash("Paste a short-lived user token from Graph API Explorer first.", "warning")
-        return redirect(url_for("main.social_account_settings"))
-
-    try:
-        result = _generate_long_lived_instagram_page_token(
-            instagram_id=instagram_id,
-            page_id=page_id,
-            app_id=app_id,
-            app_secret=app_secret,
-            short_lived_user_token=short_lived_user_token,
-        )
-    except RuntimeError as exc:
-        add_log(None, "ERROR", f"Instagram long-lived token generation failed: {exc}")
-        flash(f"Instagram token generation failed: {exc}", "warning")
-    else:
-        update_social_account_credentials(
-            "Instagram",
-            {
-                "access_token": result["page_access_token"],
-                "token_expires_at": result["token_expires_at"],
-                "token_expires_label": result["token_expires_label"],
-                "token_source": "Long-lived Page token",
-            },
-            connection_status=STATUS_CONNECTED,
-        )
-        add_log(None, "SUCCESS", f"Instagram long-lived Page token saved for IG ID {instagram_id}.")
-        flash(f"Instagram long-lived Page token saved. {result['token_expires_label']}", "success")
+        add_log(None, "SUCCESS", f"Instagram OAuth connected and token saved for IG ID {instagram_id}.")
+        flash(f"Instagram connected. Token saved automatically. {_format_meta_expiry(expires_at)}", "success")
     return redirect(url_for("main.social_account_settings"))
 
 
@@ -1162,6 +1114,44 @@ def _exchange_threads_authorization_code(app_id, app_secret, code, redirect_uri)
         raise RuntimeError(f"Threads token exchange failed: {exc}") from exc
 
 
+def _exchange_instagram_authorization_code(app_id, app_secret, code, redirect_uri):
+    data = urlencode(
+        {
+            "client_id": app_id,
+            "client_secret": app_secret,
+            "grant_type": "authorization_code",
+            "redirect_uri": redirect_uri,
+            "code": code,
+        }
+    ).encode("utf-8")
+    request = Request(
+        "https://api.instagram.com/oauth/access_token",
+        data=data,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=20) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Instagram token exchange failed {exc.code}: {_clean_meta_error(detail)}") from exc
+    except (URLError, TimeoutError, ValueError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"Instagram token exchange failed: {exc}") from exc
+
+
+def _exchange_instagram_long_lived_token(app_secret, short_lived_token):
+    return _instagram_get_json(
+        "https://graph.instagram.com/access_token",
+        {
+            "grant_type": "ig_exchange_token",
+            "client_secret": app_secret,
+            "access_token": short_lived_token,
+        },
+        "Instagram long-lived token exchange",
+    )
+
+
 def _exchange_facebook_authorization_code(app_id, app_secret, code, redirect_uri):
     return _meta_get_json(
         "https://graph.facebook.com/v20.0/oauth/access_token",
@@ -1228,21 +1218,11 @@ def _verify_instagram_account(credentials):
         raise RuntimeError("Instagram needs Instagram Business ID and Access Token.")
 
     account = _meta_get_json(
-        f"https://graph.facebook.com/v20.0/{instagram_id}",
+        f"https://graph.instagram.com/v20.0/{instagram_id}",
         {"fields": "id,username", "access_token": access_token},
         "Instagram account lookup",
     )
-    app_id, app_secret = _meta_app_credentials(credentials)
-    if not app_id or not app_secret:
-        return (
-            f"Instagram account {account.get('username') or account.get('id')} is readable; "
-            "scope check skipped because Meta App ID/App Secret are saved in the Facebook card and were not found."
-        )
-    scopes = _meta_scopes_from_debug_data(_debug_meta_token(access_token, app_id, app_secret))
-    missing_scopes = [scope for scope in ["instagram_basic", "instagram_content_publish"] if scope not in scopes]
-    if missing_scopes:
-        raise RuntimeError(f"Instagram account is readable, but missing scopes: {', '.join(missing_scopes)}.")
-    return f"Instagram account {account.get('username') or account.get('id')} is readable; publish scopes are present."
+    return f"Instagram account {account.get('username') or account.get('id')} is readable with the saved Instagram Login token."
 
 
 def _meta_app_credentials(credentials=None):
@@ -1274,30 +1254,6 @@ def _generate_long_lived_facebook_page_token(page_id, app_id, app_secret, short_
         required_scopes=["pages_read_engagement", "pages_manage_posts"],
         lookup_label="Facebook",
     )
-
-
-def _generate_long_lived_instagram_page_token(instagram_id, page_id, app_id, app_secret, short_lived_user_token):
-    result = _generate_long_lived_meta_page_token(
-        page_id=page_id,
-        app_id=app_id,
-        app_secret=app_secret,
-        short_lived_user_token=short_lived_user_token,
-        required_scopes=["pages_read_engagement", "instagram_basic", "instagram_content_publish"],
-        lookup_label="Instagram",
-    )
-    linked_instagram = _meta_get_json(
-        f"https://graph.facebook.com/v20.0/{page_id}",
-        {"fields": "instagram_business_account{id,username}", "access_token": result["page_access_token"]},
-        "Instagram linked Page lookup",
-    )
-    linked_account = linked_instagram.get("instagram_business_account") or {}
-    if str(linked_account.get("id", "")) != str(instagram_id):
-        raise RuntimeError(
-            "The selected Facebook Page is readable, but it is not linked to the configured Instagram Business ID. "
-            f"Meta returned Instagram ID {linked_account.get('id') or 'none'} for Page ID {page_id}."
-        )
-    result["instagram_username"] = linked_account.get("username", "")
-    return result
 
 
 def _generate_long_lived_meta_page_token(page_id, app_id, app_secret, short_lived_user_token, required_scopes, lookup_label):
@@ -1389,6 +1345,18 @@ def _format_meta_expiry(expires_at):
 
 
 def _meta_get_json(url, params, endpoint_name):
+    request_url = f"{url}?{urlencode(params)}"
+    try:
+        with urlopen(Request(request_url, method="GET"), timeout=20) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"{endpoint_name} error {exc.code}: {_clean_meta_error(detail)}") from exc
+    except (URLError, TimeoutError, ValueError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"{endpoint_name} failed: {exc}") from exc
+
+
+def _instagram_get_json(url, params, endpoint_name):
     request_url = f"{url}?{urlencode(params)}"
     try:
         with urlopen(Request(request_url, method="GET"), timeout=20) as response:

@@ -138,34 +138,19 @@
             <form method="post" action="{{ url_for('main.connect_instagram_account') }}" class="social-account-form">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <label>
-                    Shared Meta OAuth callback
-                    <input class="readonly-copy-field" type="text" readonly value="{{ shared_meta_callback_url }}" onclick="this.select()">
+                    Instagram OAuth callback
+                    <input class="readonly-copy-field" type="text" readonly value="{{ url_for('main.instagram_oauth_callback', _external=True) }}" onclick="this.select()">
                     <span class="field-help">
-                        Add this exact URL, without a trailing slash, in Meta's OAuth redirect URI allowlist for Facebook Login / Login for Business. App domain: {{ request.host }}.
+                        Add this exact URL, without a trailing slash, in the Instagram API login callback settings. App domain: {{ request.host }}.
                     </span>
                 </label>
                 <p class="field-help">
-                    Instagram Connect uses the Meta App ID saved in the Facebook card:
-                    <strong>{{ social_public_credentials.get("Facebook", {}).get("app_id") or "missing" }}</strong>.
-                    Add the callback and app domain to that exact Meta app.
+                    Instagram Connect now uses Instagram Login scopes:
+                    <strong>instagram_business_basic</strong> and
+                    <strong>instagram_business_content_publish</strong>.
+                    Save the Instagram App ID/App Secret in this card before connecting.
                 </p>
                 <button class="button primary" type="submit">Connect Instagram</button>
-            </form>
-            <form method="post" action="{{ url_for('main.extend_instagram_page_token') }}" class="social-account-form">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <label>
-                    Fallback: short-lived User Token from Graph API Explorer
-                    <input
-                        type="password"
-                        name="short_lived_user_token"
-                        autocomplete="off"
-                        placeholder="Paste a temporary user token with Instagram publishing permissions"
-                    >
-                    <span class="field-help">
-                        The app exchanges this user token, finds the configured Facebook Page, confirms the linked Instagram Business account, and saves the long-lived Page token.
-                    </span>
-                </label>
-                <button class="button primary" type="submit">Generate Instagram long-lived token</button>
             </form>
             {% endif %}
             {% if account %}

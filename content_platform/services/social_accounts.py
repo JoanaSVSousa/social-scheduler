@@ -12,7 +12,7 @@ from ..database import get_connection
 PUBLIC_FIELDS = ["account_label", "account_handle", "auth_type"]
 PUBLIC_CREDENTIAL_FIELDS = {
     "Facebook": {"page_id", "app_id"},
-    "Instagram": {"instagram_business_id", "facebook_page_id"},
+    "Instagram": {"instagram_business_id", "facebook_page_id", "app_id"},
     "LinkedIn": {"organization_id"},
     "X": {"api_key", "oauth2_client_id"},
     "Threads": {"app_id", "threads_user_id"},
@@ -25,12 +25,14 @@ STATUS_NEEDS_VERIFICATION = "Needs verification"
 
 SOCIAL_ACCOUNT_SCHEMAS = {
     "Instagram": {
-        "description": "Meta/Instagram publishing needs a professional IG account, its linked Facebook Page, and a long-lived Page access token. The Connect Instagram button can generate it from the Meta app credentials saved in Facebook.",
-        "auth_options": [("meta_graph", "Meta Graph API")],
+        "description": "Instagram publishing uses Instagram Login with a professional account, an Instagram App ID/App Secret, and a long-lived Instagram access token.",
+        "auth_options": [("instagram_login", "Instagram Login")],
         "fields": [
-            {"name": "instagram_business_id", "label": "Instagram Business ID", "placeholder": "1784...", "example": "Example: 17841400000000000"},
-            {"name": "facebook_page_id", "label": "Linked Facebook Page ID", "placeholder": "Page ID", "example": "Example: 123456789012345"},
-            {"name": "access_token", "label": "Long-lived Access Token", "placeholder": "Paste Meta access token", "example": "Starts with EAA..."},
+            {"name": "app_id", "label": "Instagram App ID", "placeholder": "Instagram app id", "example": "Use the App ID from the Instagram API product/app."},
+            {"name": "app_secret", "label": "Instagram App Secret", "placeholder": "Instagram app secret", "example": "Only the secret stays hidden after saving."},
+            {"name": "instagram_business_id", "label": "Instagram User ID", "placeholder": "Will be saved by Connect Instagram", "example": "Connect Instagram can fill this automatically."},
+            {"name": "facebook_page_id", "label": "Linked Facebook Page ID", "placeholder": "Optional legacy Page ID", "example": "Only needed for older Instagram Graph/Page-token flows."},
+            {"name": "access_token", "label": "Long-lived Access Token", "placeholder": "Saved by Connect Instagram", "example": "Connect Instagram should generate this automatically."},
         ],
     },
     "Facebook": {
@@ -237,7 +239,7 @@ def _normalize_credential_value(platform, field_name, value):
     value = (value or "").strip()
     if platform == "Facebook" and field_name == "page_id":
         return _first_numeric_id(value)
-    if platform == "Instagram" and field_name in {"instagram_business_id", "facebook_page_id"}:
+    if platform == "Instagram" and field_name in {"app_id", "instagram_business_id", "facebook_page_id"}:
         return _first_numeric_id(value)
     if platform == "Threads" and field_name in {"app_id", "threads_user_id"}:
         return _first_numeric_id(value)

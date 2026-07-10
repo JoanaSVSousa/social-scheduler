@@ -195,7 +195,7 @@ def publish_to_instagram(post, media_items):
         payload["image_url"] = image_url
 
     container = _post_form(
-        f"https://graph.facebook.com/v20.0/{instagram_id}/media",
+        f"https://graph.instagram.com/v20.0/{instagram_id}/media",
         payload,
         endpoint_name="Instagram create media container",
         error_label="Instagram API",
@@ -205,7 +205,7 @@ def publish_to_instagram(post, media_items):
         raise PublicationError("Instagram did not return a media container id.")
 
     response = _post_form(
-        f"https://graph.facebook.com/v20.0/{instagram_id}/media_publish",
+        f"https://graph.instagram.com/v20.0/{instagram_id}/media_publish",
         {"creation_id": creation_id, "access_token": access_token},
         endpoint_name="Instagram publish media",
         error_label="Instagram API",
