@@ -54,6 +54,13 @@
                 {% endfor %}
             </select>
         </label>
+        <label>
+            Source type
+            <select name="source_type" id="source-type-select" required>
+                <option value="Regular" {% if not post or post.source_type == "Regular" %}selected{% endif %}>Regular</option>
+                <option value="News" {% if post and post.source_type == "News" %}selected{% endif %}>News</option>
+            </select>
+        </label>
     </div>
 
     {% set scheduled_parts = datetime_parts(post.scheduled_at if post else '') %}
@@ -205,8 +212,11 @@ const contentLimits = {{ content_limits|tojson }};
 const platformSelect = document.querySelector("#platform-select");
 const formatSelect = document.querySelector("#format-select");
 const statusSelect = document.querySelector("#status-select");
+const sourceTypeSelect = document.querySelector("#source-type-select");
 const scheduledDate = document.querySelector("#scheduled-date");
 const scheduledTime = document.querySelector("#scheduled-time");
+const repeatCountInput = document.querySelector("input[name='repeat_count']");
+const repeatIntervalInput = document.querySelector("input[name='repeat_interval_days']");
 const titleInput = document.querySelector("input[name='title']");
 const contentInput = document.querySelector("textarea[name='content']");
 const hashtagsInput = document.querySelector("input[name='hashtags']");
@@ -271,6 +281,12 @@ function syncPreview() {
     previewContent.textContent = contentInput.value.trim() || "Write the post content to preview it here.";
     previewHashtags.textContent = hashtagsInput.value.trim();
     previewCard.className = `social-preview ${previewClassForFormat(format)} ${previewCopyClassForFormat(format)}`;
+}
+
+function syncNewsRepeatHints() {
+    const isNews = sourceTypeSelect.value === "News";
+    repeatCountInput.placeholder = isNews ? "3" : "4";
+    repeatIntervalInput.placeholder = isNews ? "2" : "14";
 }
 
 function contentBudget() {
@@ -339,6 +355,7 @@ statusSelect.addEventListener("change", () => {
     scheduledTime.required = statusSelect.value === "Scheduled";
     syncPreview();
 });
+sourceTypeSelect.addEventListener("change", syncNewsRepeatHints);
 titleInput.addEventListener("input", syncPreview);
 contentInput.addEventListener("input", () => {
     enforceContentBudget();
@@ -381,6 +398,7 @@ document.querySelectorAll("[data-delete-media]").forEach((button) => {
 
 syncFormats();
 enforceContentBudget();
+syncNewsRepeatHints();
 scheduledDate.required = statusSelect.value === "Scheduled";
 scheduledTime.required = statusSelect.value === "Scheduled";
 syncPreview();

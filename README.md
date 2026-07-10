@@ -189,7 +189,7 @@ Graph API Explorer often gives short-lived user tokens. For daily team use, do n
 Facebook recommended workflow:
 
 1. Save the Facebook Page ID, Meta App ID, and Meta App Secret in API Accounts.
-2. Add the OAuth callback shown in the Facebook card to the Meta app settings.
+2. Add the shared Meta OAuth callback shown in the Facebook/Instagram cards to the Meta app settings.
 3. Click `Connect Facebook`.
 
 The app opens Meta OAuth, receives the authorization code, exchanges it for a user token, fetches `/me/accounts`, selects the configured Page, stores the Page access token, and records the expiry information returned by Meta.
@@ -198,10 +198,16 @@ Instagram recommended workflow:
 
 1. Save the Instagram Business ID and linked Facebook Page ID in API Accounts.
 2. Keep the Meta App ID and Meta App Secret saved in the Facebook card.
-3. Add the OAuth callback shown in the Instagram card to the Meta app settings.
+3. Add the shared Meta OAuth callback shown in the Facebook/Instagram cards to the Meta app settings.
 4. Click `Connect Instagram`.
 
 The app opens Meta OAuth with Instagram publishing scopes, exchanges the code, fetches the configured Facebook Page token, confirms that the Page is linked to the configured Instagram Business account, stores the token, and records the expiry information returned by Meta.
+
+Production callback URL:
+
+```txt
+https://social-scheduler-u1we.onrender.com/settings/social-accounts/meta/callback
+```
 
 Fallback workflow for Facebook or Instagram:
 

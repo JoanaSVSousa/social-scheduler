@@ -81,6 +81,8 @@ from .services.squared_feeds import SQUARED_FEEDS
 
 
 bp = Blueprint("main", __name__)
+NEWS_REPEAT_COUNT = "3"
+NEWS_REPEAT_INTERVAL_DAYS = "2"
 
 
 @bp.route("/")
@@ -494,7 +496,7 @@ def edit_rss_article(rss_item_id):
             abort(400)
         if not general_values["title"] or not general_values["content"]:
             abort(400)
-        general_schedule_dates = _schedule_dates_from_general_form()
+        general_schedule_dates = _schedule_dates_from_general_form(content_type)
         general_media_files = request.files.getlist("general_media_files")
         updates = []
         for post in posts:
@@ -537,7 +539,11 @@ def edit_rss_article(rss_item_id):
                 if _uses_field_override(prefix, "format")
                 else general_content_format
             )
-            schedule_dates = _schedule_dates_from_prefixed_form(prefix) if _uses_field_override(prefix, "schedule") else general_schedule_dates
+            schedule_dates = (
+                _schedule_dates_from_prefixed_form(prefix, content_type)
+                if _uses_field_override(prefix, "schedule")
+                else general_schedule_dates
+            )
             replace_schedules(post["id"], schedule_dates)
             _reset_file_streams(general_media_files)
             saved, skipped = save_media_files(post["id"], general_media_files, content_format)
@@ -589,8 +595,9 @@ def edit_rss_article(rss_item_id):
 def new_post():
     if request.method == "POST":
         validate_csrf()
-        post_id = create_post(_post_from_form())
-        replace_schedules(post_id, _schedule_dates_from_form())
+        post_data = _post_from_form()
+        post_id = create_post(post_data)
+        replace_schedules(post_id, _schedule_dates_from_form(post_data.source_type))
         saved, skipped = save_media_files(post_id, request.files.getlist("media_files"), request.form.get("content_format", ""))
         _flash_media_result(saved, skipped)
         flash("Post created. You can keep editing or publish it when ready.", "success")
@@ -621,8 +628,9 @@ def edit_post(post_id):
 
     if request.method == "POST":
         validate_csrf()
-        update_post(post_id, _post_from_form())
-        replace_schedules(post_id, _schedule_dates_from_form())
+        post_data = _post_from_form()
+        update_post(post_id, post_data)
+        replace_schedules(post_id, _schedule_dates_from_form(post_data.source_type))
         saved, skipped = save_media_files(post_id, request.files.getlist("media_files"), request.form.get("content_format", ""))
         _flash_media_result(saved, skipped)
         if request.form.get("publish_after_save") == "1":
@@ -785,8 +793,9 @@ def connect_facebook_account():
         return redirect(url_for("main.social_account_settings"))
 
     state = secrets.token_urlsafe(24)
-    session["facebook_oauth_state"] = state
-    redirect_uri = url_for("main.facebook_oauth_callback", _external=True)
+    session["meta_oauth_state"] = state
+    session["meta_oauth_platform"] = "Facebook"
+    redirect_uri = url_for("main.meta_oauth_callback", _external=True)
     authorization_url = "https://www.facebook.com/v20.0/dialog/oauth?" + urlencode(
         {
             "client_id": app_id,
@@ -797,6 +806,29 @@ def connect_facebook_account():
         }
     )
     return redirect(authorization_url)
+
+
+@bp.get("/settings/social-accounts/meta/callback")
+@login_required
+def meta_oauth_callback():
+    if request.args.get("state") != session.pop("meta_oauth_state", ""):
+        flash("Meta authorization state did not match. Please try connecting again.", "warning")
+        return redirect(url_for("main.social_account_settings"))
+
+    platform = session.pop("meta_oauth_platform", "")
+    code = request.args.get("code", "").strip()
+    if not code:
+        flash(request.args.get("error_description") or "Meta did not return an authorization code.", "warning")
+        return redirect(url_for("main.social_account_settings"))
+
+    redirect_uri = url_for("main.meta_oauth_callback", _external=True)
+    if platform == "Facebook":
+        return _complete_facebook_oauth_connection(code, redirect_uri)
+    if platform == "Instagram":
+        return _complete_instagram_oauth_connection(code, redirect_uri)
+
+    flash("Meta authorization did not identify whether this was Facebook or Instagram. Please try again.", "warning")
+    return redirect(url_for("main.social_account_settings"))
 
 
 @bp.get("/settings/social-accounts/Facebook/callback")
@@ -811,6 +843,11 @@ def facebook_oauth_callback():
         flash(request.args.get("error_description") or "Facebook did not return an authorization code.", "warning")
         return redirect(url_for("main.social_account_settings"))
 
+    redirect_uri = url_for("main.facebook_oauth_callback", _external=True)
+    return _complete_facebook_oauth_connection(code, redirect_uri)
+
+
+def _complete_facebook_oauth_connection(code, redirect_uri):
     account = decrypt_credentials_for_publisher("Facebook")
     credentials = (account or {}).get("credentials", {})
     page_id = credentials.get("page_id", "")
@@ -820,7 +857,6 @@ def facebook_oauth_callback():
         flash("Facebook Page ID, App ID, or App Secret are missing. Save them and connect again.", "warning")
         return redirect(url_for("main.social_account_settings"))
 
-    redirect_uri = url_for("main.facebook_oauth_callback", _external=True)
     try:
         token_payload = _exchange_facebook_authorization_code(app_id, app_secret, code, redirect_uri)
         result = _generate_long_lived_facebook_page_token(
@@ -909,8 +945,9 @@ def connect_instagram_account():
         return redirect(url_for("main.social_account_settings"))
 
     state = secrets.token_urlsafe(24)
-    session["instagram_oauth_state"] = state
-    redirect_uri = url_for("main.instagram_oauth_callback", _external=True)
+    session["meta_oauth_state"] = state
+    session["meta_oauth_platform"] = "Instagram"
+    redirect_uri = url_for("main.meta_oauth_callback", _external=True)
     authorization_url = "https://www.facebook.com/v20.0/dialog/oauth?" + urlencode(
         {
             "client_id": app_id,
@@ -935,6 +972,11 @@ def instagram_oauth_callback():
         flash(request.args.get("error_description") or "Instagram did not return an authorization code.", "warning")
         return redirect(url_for("main.social_account_settings"))
 
+    redirect_uri = url_for("main.instagram_oauth_callback", _external=True)
+    return _complete_instagram_oauth_connection(code, redirect_uri)
+
+
+def _complete_instagram_oauth_connection(code, redirect_uri):
     account = decrypt_credentials_for_publisher("Instagram")
     credentials = (account or {}).get("credentials", {})
     instagram_id = credentials.get("instagram_business_id", "")
@@ -944,7 +986,6 @@ def instagram_oauth_callback():
         flash("Instagram Business ID, linked Facebook Page ID, App ID, or App Secret are missing.", "warning")
         return redirect(url_for("main.social_account_settings"))
 
-    redirect_uri = url_for("main.instagram_oauth_callback", _external=True)
     try:
         token_payload = _exchange_facebook_authorization_code(app_id, app_secret, code, redirect_uri)
         result = _generate_long_lived_instagram_page_token(
@@ -1519,12 +1560,15 @@ def _post_from_form():
     hashtags = request.form.get("hashtags", "").strip()
     platform = request.form["platform"]
     status = request.form["status"]
+    source_type = request.form.get("source_type", "Regular")
     content_format = request.form.get("content_format", "").strip() or default_content_format(platform)
     scheduled_at = _datetime_from_form()
 
     if platform not in PLATFORMS:
         abort(400)
     if status not in STATUSES:
+        abort(400)
+    if source_type not in {"Regular", "News"}:
         abort(400)
     if content_format not in PLATFORM_CONTENT_FORMATS.get(platform, []):
         abort(400)
@@ -1546,7 +1590,7 @@ def _post_from_form():
         content_format=content_format,
         scheduled_at=scheduled_at,
         status=status,
-        source_type="Regular",
+        source_type=source_type,
     )
 
 
@@ -1615,18 +1659,18 @@ def _reset_file_streams(files):
             continue
 
 
-def _schedule_dates_from_form():
+def _schedule_dates_from_form(source_type="Regular"):
     dates = []
     primary = _datetime_from_form()
     if primary:
         dates.append(primary)
     extra_dates = request.form.get("schedule_dates", "")
     dates.extend(_normalize_datetime_value(line.strip()) for line in extra_dates.splitlines() if line.strip())
-    dates.extend(_recurring_dates_from_form(""))
-    return dates
+    dates.extend(_recurring_dates_from_form("", source_type, primary))
+    return _unique_schedule_dates(dates)
 
 
-def _schedule_dates_from_prefixed_form(prefix):
+def _schedule_dates_from_prefixed_form(prefix, source_type="Regular"):
     dates = []
     primary = _datetime_from_form(prefix)
     if primary:
@@ -1634,11 +1678,11 @@ def _schedule_dates_from_prefixed_form(prefix):
 
     extra_dates = request.form.get(prefix + "schedule_dates", "")
     dates.extend(_normalize_datetime_value(line.strip()) for line in extra_dates.splitlines() if line.strip())
-    dates.extend(_recurring_dates_from_form(prefix))
-    return dates
+    dates.extend(_recurring_dates_from_form(prefix, source_type, primary))
+    return _unique_schedule_dates(dates)
 
 
-def _schedule_dates_from_general_form():
+def _schedule_dates_from_general_form(source_type="Regular"):
     dates = []
     primary = _datetime_from_form("", "general_scheduled")
     if primary:
@@ -1646,14 +1690,28 @@ def _schedule_dates_from_general_form():
 
     extra_dates = request.form.get("general_schedule_dates", "")
     dates.extend(_normalize_datetime_value(line.strip()) for line in extra_dates.splitlines() if line.strip())
-    dates.extend(_recurring_dates_from_form("general_"))
-    return dates
+    dates.extend(_recurring_dates_from_form("general_", source_type, primary))
+    return _unique_schedule_dates(dates)
 
 
-def _recurring_dates_from_form(prefix):
-    start = _datetime_from_form(prefix, "repeat")
+def _unique_schedule_dates(dates):
+    seen = set()
+    cleaned = []
+    for date in dates:
+        if not date or date in seen:
+            continue
+        seen.add(date)
+        cleaned.append(date)
+    return cleaned
+
+
+def _recurring_dates_from_form(prefix, source_type="Regular", fallback_start=""):
+    start = _datetime_from_form(prefix, "repeat") or (fallback_start if source_type == "News" else "")
     count = request.form.get(prefix + "repeat_count", "").strip()
     interval_days = request.form.get(prefix + "repeat_interval_days", "").strip()
+    if source_type == "News" and start:
+        count = count or NEWS_REPEAT_COUNT
+        interval_days = interval_days or NEWS_REPEAT_INTERVAL_DAYS
     if not start or not count or not interval_days:
         return []
 

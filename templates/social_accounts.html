@@ -106,7 +106,7 @@
             {% if platform == "Facebook" and account %}
             <form method="post" action="{{ url_for('main.connect_facebook_account') }}" class="social-account-form">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <p class="field-help">OAuth callback URL for Meta: {{ url_for('main.facebook_oauth_callback', _external=True) }}</p>
+                <p class="field-help">OAuth callback URL for Meta: {{ url_for('main.meta_oauth_callback', _external=True) }}</p>
                 <button class="button primary" type="submit">Connect Facebook</button>
             </form>
             <form method="post" action="{{ url_for('main.extend_facebook_page_token') }}" class="social-account-form">
@@ -129,7 +129,7 @@
             {% if platform == "Instagram" and account %}
             <form method="post" action="{{ url_for('main.connect_instagram_account') }}" class="social-account-form">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <p class="field-help">OAuth callback URL for Meta: {{ url_for('main.instagram_oauth_callback', _external=True) }}</p>
+                <p class="field-help">OAuth callback URL for Meta: {{ url_for('main.meta_oauth_callback', _external=True) }}</p>
                 <button class="button primary" type="submit">Connect Instagram</button>
             </form>
             <form method="post" action="{{ url_for('main.extend_instagram_page_token') }}" class="social-account-form">
