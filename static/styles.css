@@ -563,6 +563,11 @@ tr:last-child td {
     margin-top: 0;
 }
 
+.readonly-copy-field {
+    cursor: text;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
 .table-link {
     color: white;
     font-weight: 900;

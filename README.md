@@ -209,6 +209,8 @@ Production callback URL:
 https://social-scheduler-u1we.onrender.com/settings/social-accounts/meta/callback
 ```
 
+Add that exact URL, without a trailing slash, to the OAuth redirect URI allowlist for the Meta login product used by the app. In the Meta UI this is usually under `Facebook Login` / `Facebook Login for Business` settings as `Valid OAuth Redirect URIs`; the generic app authentication callback field in advanced settings is not enough by itself. The app domain should be `social-scheduler-u1we.onrender.com`.
+
 Fallback workflow for Facebook or Instagram:
 
 1. Generate a short-lived user token in Graph API Explorer with:
