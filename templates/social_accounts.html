@@ -144,6 +144,11 @@
                         Add this exact URL, without a trailing slash, in Meta's OAuth redirect URI allowlist for Facebook Login / Login for Business. App domain: {{ request.host }}.
                     </span>
                 </label>
+                <p class="field-help">
+                    Instagram Connect uses the Meta App ID saved in the Facebook card:
+                    <strong>{{ social_public_credentials.get("Facebook", {}).get("app_id") or "missing" }}</strong>.
+                    Add the callback and app domain to that exact Meta app.
+                </p>
                 <button class="button primary" type="submit">Connect Instagram</button>
             </form>
             <form method="post" action="{{ url_for('main.extend_instagram_page_token') }}" class="social-account-form">
