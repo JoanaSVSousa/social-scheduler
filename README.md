@@ -188,9 +188,43 @@ Set these GitHub Actions repository secrets:
 https://your-render-service.onrender.com
 ```
 
-When `APP_BASE_URL` is set, the RSS job first calls `/healthz` to wake/check the web service, then imports new RSS items as draft posts. It does not publish scheduled posts; queue publishing should be added as a separate scheduled workflow when that process is ready.
+When `APP_BASE_URL` is set, the RSS job first calls `/healthz` to wake/check the web service, then imports new RSS items as draft posts. It does not publish scheduled posts; publishing is handled by the separate scheduled publishing workflow below.
 
 Render Cron Jobs can also run the same command if the account plan supports them. In that case, the cron service needs the same environment variables as the web service, especially `DATABASE_URL` and `APP_BASE_URL`.
+
+## Scheduled Publishing Task
+
+The repository also includes a GitHub Actions workflow that checks the publication queue every 5 minutes:
+
+```txt
+.github/workflows/publish-scheduled-posts.yml
+```
+
+It runs:
+
+```bash
+python3 scripts/process_publication_queue.py
+```
+
+Recommended schedule:
+
+```txt
+*/5 * * * *
+```
+
+GitHub Actions schedules are not a permanently running worker, so publication is processed in short polling intervals. Any post or recycled schedule with `scheduled_at` less than or equal to the app's current time is picked up on the next run. In practice, a post scheduled for `14:00` should publish on the `14:00` or `14:05` run, depending on GitHub runner timing.
+
+Set these additional GitHub Actions repository secrets if scheduled publishing uses media uploads:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_MEDIA_BUCKET`
+
+Optionally set:
+
+- `APP_TIMEZONE=Europe/Lisbon`
+
+Only schedule posts for platforms that have working credentials and implemented API publishing. Failures are marked in the app logs and affected posts/schedules are marked `Failed`.
 
 ## Media Workflow
 

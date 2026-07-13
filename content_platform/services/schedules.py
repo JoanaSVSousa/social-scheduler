@@ -1,6 +1,5 @@
-from datetime import datetime
-
 from ..database import get_connection
+from .clock import app_now_string
 
 
 def replace_schedules(post_id, schedule_dates):
@@ -43,7 +42,7 @@ def get_schedules_for_posts(post_ids):
 
 
 def get_due_schedules():
-    now = datetime.now().strftime("%Y-%m-%dT%H:%M")
+    now = app_now_string()
     with get_connection() as conn:
         return conn.execute(
             """
@@ -59,7 +58,7 @@ def get_due_schedules():
 
 
 def mark_schedule_status(schedule_id, status):
-    published_at = datetime.now().strftime("%Y-%m-%dT%H:%M") if status == "Published" else None
+    published_at = app_now_string() if status == "Published" else None
     with get_connection() as conn:
         conn.execute(
             """

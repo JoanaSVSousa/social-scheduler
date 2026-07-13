@@ -1,7 +1,6 @@
-from datetime import datetime
-
 from ..database import get_connection, insert_and_get_id
 from ..models import default_content_format, truncate_content_for_platform
+from .clock import app_now_string
 
 
 def get_all_posts(filters=None):
@@ -204,7 +203,7 @@ def delete_post(post_id):
 
 
 def get_due_posts():
-    now = datetime.now().strftime("%Y-%m-%dT%H:%M")
+    now = app_now_string()
     with get_connection() as conn:
         return conn.execute(
             """

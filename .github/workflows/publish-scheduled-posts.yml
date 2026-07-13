@@ -1,0 +1,41 @@
+name: Publish scheduled posts
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: publish-scheduled-posts
+  cancel-in-progress: false
+
+jobs:
+  publish-scheduled-posts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+      APP_TIMEZONE: ${{ secrets.APP_TIMEZONE || 'Europe/Lisbon' }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      CREDENTIALS_ENCRYPTION_KEY: ${{ secrets.CREDENTIALS_ENCRYPTION_KEY }}
+      ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+      ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_MEDIA_BUCKET: ${{ secrets.SUPABASE_MEDIA_BUCKET }}
+      FLASK_DEBUG: "0"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Publish due posts
+        run: python scripts/process_publication_queue.py
