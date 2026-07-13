@@ -942,7 +942,7 @@ def connect_instagram_account():
 
     state = secrets.token_urlsafe(24)
     session["instagram_oauth_state"] = state
-    redirect_uri = _external_oauth_url("main.instagram_oauth_callback")
+    redirect_uri = _external_oauth_url("main.instagram_oauth_callback_lower")
     authorization_url = "https://www.instagram.com/oauth/authorize?" + urlencode(
         {
             "client_id": app_id,
@@ -957,9 +957,19 @@ def connect_instagram_account():
     return redirect(authorization_url)
 
 
+@bp.get("/settings/social-accounts/instagram/callback")
+@login_required
+def instagram_oauth_callback_lower():
+    return _handle_instagram_oauth_callback("main.instagram_oauth_callback_lower")
+
+
 @bp.get("/settings/social-accounts/Instagram/callback")
 @login_required
 def instagram_oauth_callback():
+    return _handle_instagram_oauth_callback("main.instagram_oauth_callback")
+
+
+def _handle_instagram_oauth_callback(callback_endpoint):
     if request.args.get("state") != session.pop("instagram_oauth_state", ""):
         flash("Instagram authorization state did not match. Please try connecting again.", "warning")
         return redirect(url_for("main.social_account_settings"))
@@ -969,7 +979,7 @@ def instagram_oauth_callback():
         flash(request.args.get("error_description") or "Instagram did not return an authorization code.", "warning")
         return redirect(url_for("main.social_account_settings"))
 
-    redirect_uri = _external_oauth_url("main.instagram_oauth_callback")
+    redirect_uri = _external_oauth_url(callback_endpoint)
     return _complete_instagram_oauth_connection(code, redirect_uri)
 
 

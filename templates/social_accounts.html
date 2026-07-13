@@ -139,7 +139,7 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <label>
                     Instagram OAuth callback
-                    <input class="readonly-copy-field" type="text" readonly value="{{ url_for('main.instagram_oauth_callback', _external=True) }}" onclick="this.select()">
+                    <input class="readonly-copy-field" type="text" readonly value="{{ url_for('main.instagram_oauth_callback_lower', _external=True) }}" onclick="this.select()">
                     <span class="field-help">
                         Add this exact URL, without a trailing slash, in the Instagram API login callback settings. App domain: {{ request.host }}.
                     </span>

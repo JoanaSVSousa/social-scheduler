@@ -213,7 +213,7 @@ Add that exact URL, without a trailing slash, to the OAuth redirect URI allowlis
 Production Instagram callback URL:
 
 ```txt
-https://social-scheduler-u1we.onrender.com/settings/social-accounts/Instagram/callback
+https://social-scheduler-u1we.onrender.com/settings/social-accounts/instagram/callback
 ```
 
 Fallback workflow for Facebook or Instagram:
