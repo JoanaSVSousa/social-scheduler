@@ -38,10 +38,10 @@ The goal is not just to store posts. The goal is to model a real automation work
 - Supabase Storage support for public media URLs
 - Image compression for API limits
 - MP4 video upload validation for API publishing
-- Real API publishing for Bluesky and Facebook feed/photo/video posts
+- Real API publishing for Bluesky, Facebook feed/photo/video posts, and Instagram Graph feed media through the linked Facebook Page token
 - Credential storage encrypted at rest
-- API account verification for Meta/Facebook and Instagram credentials
-- Long-lived Meta Page token helpers for Facebook and Instagram to reduce manual token replacement
+- API account verification for Facebook and Instagram through Meta Graph
+- Long-lived Meta Page token helpers for Facebook; Instagram reuses the same Page token
 
 ## Platform Status
 
@@ -49,7 +49,7 @@ The goal is not just to store posts. The goal is to model a real automation work
 | --- | --- |
 | Bluesky | Real publishing implemented for text, links, hashtags, and image embeds. |
 | Facebook | Real Page publishing implemented for feed posts, link posts, photos, and videos. Stories/Reels are protected until dedicated endpoints are implemented. |
-| Instagram | Credential storage and publishing flow scaffolded. Needs final credential verification/testing for real use. |
+| Instagram | Publishing implemented through the linked Facebook Page token for Graph API media containers. Feed media is the primary supported path; Reels/Stories remain endpoint-specific testing work. |
 | Threads | Credential storage and publishing flow scaffolded. Needs correct user token flow and final testing. |
 | X | Kept in roadmap/manual flow because free general API access is deprecated. |
 | LinkedIn | Credential storage and text/link publishing scaffolded. |
@@ -257,18 +257,19 @@ Graph API Explorer often gives short-lived user tokens. For daily team use, do n
 Facebook recommended workflow:
 
 1. Save the Facebook Page ID, Meta App ID, and Meta App Secret in API Accounts.
-2. Add the shared Meta OAuth callback shown in the Facebook/Instagram cards to the Meta app settings.
+2. Add the shared Meta OAuth callback shown in the Facebook card to the Meta app settings.
 3. Click `Connect Facebook`.
 
 The app opens Meta OAuth, receives the authorization code, exchanges it for a user token, fetches `/me/accounts`, selects the configured Page, stores the Page access token, and records the expiry information returned by Meta.
 
 Instagram recommended workflow:
 
-1. Save the Instagram App ID and Instagram App Secret in the Instagram card.
-2. Add the Instagram OAuth callback shown in the Instagram card to the Instagram API login callback settings.
-3. Click `Connect Instagram`.
+1. Connect Facebook first using the workflow above.
+2. Save the Instagram Business/Creator ID in the Instagram card.
+3. Save the linked Facebook Page ID in the Instagram card.
+4. Click `Verify credentials` on Instagram.
 
-The app opens Instagram Login with `instagram_business_basic` and `instagram_business_content_publish`, exchanges the code, upgrades the token to a longer-lived Instagram token, saves the Instagram user ID, and records the expiry information returned by Meta.
+Instagram publishing deliberately reuses the working Facebook Page token and the Meta Graph API. The Instagram card does not store a separate Instagram token, App ID, App Secret, or OAuth callback. This avoids stale Instagram Login tokens and keeps Meta publishing on one operational flow.
 
 Production shared Meta callback URL for Facebook:
 
@@ -278,25 +279,16 @@ https://social-scheduler-u1we.onrender.com/settings/social-accounts/meta/callbac
 
 Add that exact URL, without a trailing slash, to the OAuth redirect URI allowlist for the Meta login product used by the app. In the Meta UI this is usually under `Facebook Login` / `Facebook Login for Business` settings as `Valid OAuth Redirect URIs`; the generic app authentication callback field in advanced settings is not enough by itself. The app domain should be `social-scheduler-u1we.onrender.com`.
 
-Production Instagram callback URL:
-
-```txt
-https://social-scheduler-u1we.onrender.com/settings/social-accounts/instagram/callback
-```
-
-Fallback workflow for Facebook or Instagram:
+Fallback workflow for Meta Page tokens:
 
 1. Generate a short-lived user token in Graph API Explorer with:
    - `pages_show_list`
    - `pages_read_engagement`
    - `pages_manage_posts`
-   - Use the Instagram Login connect button for Instagram. Do not use the legacy `instagram_basic` or `instagram_content_publish` scopes if the Meta app reports them as invalid.
 2. Paste that temporary user token into the Facebook card.
 3. Click `Generate long-lived Page token`.
 
-For Instagram, paste the temporary token into the Instagram card and click `Generate Instagram long-lived token`.
-
-The fallback performs the same Page-token selection, but OAuth Connect is the preferred operational path. Tokens can still be invalidated by Meta if permissions change, the app is removed, the password is reset, or Meta security policy requires reauthorization.
+Instagram then uses the saved Facebook Page token. Tokens can still be invalidated by Meta if permissions change, the app is removed, the password is reset, or Meta security policy requires reauthorization.
 
 ## Email Dashboard Report
 
@@ -366,7 +358,7 @@ This project demonstrates:
 
 ## Roadmap
 
-- Finish Instagram publishing with feed, reels, stories, and video validation
+- Finish dedicated Instagram Reels/Stories validation and format-specific guardrails
 - Finish Threads OAuth/user-token flow
 - Add verification buttons for every API account
 - Add retry/backoff queue for scheduled publishing

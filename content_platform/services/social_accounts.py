@@ -12,7 +12,7 @@ from ..database import get_connection
 PUBLIC_FIELDS = ["account_label", "account_handle", "auth_type"]
 PUBLIC_CREDENTIAL_FIELDS = {
     "Facebook": {"page_id", "app_id"},
-    "Instagram": {"instagram_business_id", "facebook_page_id", "app_id"},
+    "Instagram": {"instagram_business_id", "facebook_page_id"},
     "LinkedIn": {"organization_id"},
     "X": {"api_key", "oauth2_client_id"},
     "Threads": {"app_id", "threads_user_id"},
@@ -26,16 +26,13 @@ STATUS_NEEDS_VERIFICATION = "Needs verification"
 SOCIAL_ACCOUNT_SCHEMAS = {
     "Instagram": {
         "description": (
-            "Instagram can publish through the linked Facebook Page token, which is usually the most stable Meta Graph flow, "
-            "or through Instagram Login when the Instagram account has been fully authorized for the app."
+            "Instagram publishing uses the linked Facebook Page token from the Facebook card. "
+            "This keeps Meta publishing on one working Graph API flow instead of storing a separate Instagram token."
         ),
-        "auth_options": [("meta_graph", "Facebook Page token"), ("instagram_login", "Instagram Login")],
+        "auth_options": [("meta_graph", "Facebook Page token")],
         "fields": [
-            {"name": "app_id", "label": "Instagram App ID", "placeholder": "Instagram app id", "example": "Use the Instagram App ID for Instagram Login, or the Meta App ID for Page-token verification."},
-            {"name": "app_secret", "label": "Instagram App Secret", "placeholder": "Instagram app secret", "example": "Only the secret stays hidden after saving."},
             {"name": "instagram_business_id", "label": "Instagram User ID", "placeholder": "Instagram Business/Creator ID", "example": "The numeric Instagram professional account ID linked to the Facebook Page."},
             {"name": "facebook_page_id", "label": "Linked Facebook Page ID", "placeholder": "Facebook Page ID", "example": "Recommended for the Facebook Page token flow. Example: 123456789012345."},
-            {"name": "access_token", "label": "Long-lived Access Token", "placeholder": "Optional when Facebook card is connected", "example": "For Facebook Page token auth, this can stay blank because the app reuses the token saved in the Facebook card. For Instagram Login, use Connect Instagram."},
         ],
     },
     "Facebook": {
@@ -242,7 +239,7 @@ def _normalize_credential_value(platform, field_name, value):
     value = (value or "").strip()
     if platform == "Facebook" and field_name == "page_id":
         return _first_numeric_id(value)
-    if platform == "Instagram" and field_name in {"app_id", "instagram_business_id", "facebook_page_id"}:
+    if platform == "Instagram" and field_name in {"instagram_business_id", "facebook_page_id"}:
         return _first_numeric_id(value)
     if platform == "Threads" and field_name in {"app_id", "threads_user_id"}:
         return _first_numeric_id(value)
