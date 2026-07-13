@@ -1233,6 +1233,17 @@ def _verify_instagram_account(credentials):
     if not instagram_id or not access_token:
         raise RuntimeError("Instagram needs Instagram Business ID and Access Token.")
 
+    if credentials.get("facebook_page_id"):
+        account = _meta_get_json(
+            f"https://graph.facebook.com/v20.0/{instagram_id}",
+            {"fields": "id,username", "access_token": access_token},
+            "Instagram account lookup",
+        )
+        return (
+            f"Instagram account {account.get('username') or account.get('id')} is readable "
+            "with the saved Facebook Page token."
+        )
+
     account = _meta_get_json(
         f"https://graph.instagram.com/v20.0/{instagram_id}",
         {"fields": "id,username", "access_token": access_token},

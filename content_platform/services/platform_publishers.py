@@ -162,6 +162,7 @@ def publish_to_instagram(post, media_items):
     access_token = credentials.get("access_token")
     if not instagram_id or not access_token:
         raise PublicationError("Instagram needs an Instagram Business ID and a Meta access token with content publishing permissions.")
+    graph_base_url = _instagram_graph_base_url(account, credentials)
 
     normalized_format = (post["content_format"] or "").lower()
     public_media = _first_public_media(media_items)
@@ -195,7 +196,7 @@ def publish_to_instagram(post, media_items):
         payload["image_url"] = image_url
 
     container = _post_form(
-        f"https://graph.instagram.com/v20.0/{instagram_id}/media",
+        f"{graph_base_url}/{instagram_id}/media",
         payload,
         endpoint_name="Instagram create media container",
         error_label="Instagram API",
@@ -205,13 +206,20 @@ def publish_to_instagram(post, media_items):
         raise PublicationError("Instagram did not return a media container id.")
 
     response = _post_form(
-        f"https://graph.instagram.com/v20.0/{instagram_id}/media_publish",
+        f"{graph_base_url}/{instagram_id}/media_publish",
         {"creation_id": creation_id, "access_token": access_token},
         endpoint_name="Instagram publish media",
         error_label="Instagram API",
     )
     media_id = response.get("id")
     return f"Instagram media published: {media_id}" if media_id else "Instagram media published."
+
+
+def _instagram_graph_base_url(account, credentials):
+    auth_type = (account.get("auth_type") or "").lower()
+    if auth_type == "meta_graph" or credentials.get("facebook_page_id"):
+        return "https://graph.facebook.com/v20.0"
+    return "https://graph.instagram.com/v20.0"
 
 
 def publish_to_linkedin(post, media_items):

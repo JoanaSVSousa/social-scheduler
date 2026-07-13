@@ -25,14 +25,17 @@ STATUS_NEEDS_VERIFICATION = "Needs verification"
 
 SOCIAL_ACCOUNT_SCHEMAS = {
     "Instagram": {
-        "description": "Instagram publishing uses Instagram Login with a professional account, an Instagram App ID/App Secret, and a long-lived Instagram access token.",
-        "auth_options": [("instagram_login", "Instagram Login")],
+        "description": (
+            "Instagram can publish through the linked Facebook Page token, which is usually the most stable Meta Graph flow, "
+            "or through Instagram Login when the Instagram account has been fully authorized for the app."
+        ),
+        "auth_options": [("meta_graph", "Facebook Page token"), ("instagram_login", "Instagram Login")],
         "fields": [
-            {"name": "app_id", "label": "Instagram App ID", "placeholder": "Instagram app id", "example": "Use the App ID from the Instagram API product/app."},
+            {"name": "app_id", "label": "Instagram App ID", "placeholder": "Instagram app id", "example": "Use the Instagram App ID for Instagram Login, or the Meta App ID for Page-token verification."},
             {"name": "app_secret", "label": "Instagram App Secret", "placeholder": "Instagram app secret", "example": "Only the secret stays hidden after saving."},
-            {"name": "instagram_business_id", "label": "Instagram User ID", "placeholder": "Will be saved by Connect Instagram", "example": "Connect Instagram can fill this automatically."},
-            {"name": "facebook_page_id", "label": "Linked Facebook Page ID", "placeholder": "Optional legacy Page ID", "example": "Only needed for older Instagram Graph/Page-token flows."},
-            {"name": "access_token", "label": "Long-lived Access Token", "placeholder": "Saved by Connect Instagram", "example": "Connect Instagram should generate this automatically."},
+            {"name": "instagram_business_id", "label": "Instagram User ID", "placeholder": "Instagram Business/Creator ID", "example": "The numeric Instagram professional account ID linked to the Facebook Page."},
+            {"name": "facebook_page_id", "label": "Linked Facebook Page ID", "placeholder": "Facebook Page ID", "example": "Recommended for the Facebook Page token flow. Example: 123456789012345."},
+            {"name": "access_token", "label": "Long-lived Access Token", "placeholder": "Paste Page token or connect Instagram", "example": "For Facebook Page token auth, paste the same long-lived Page Access Token that publishes to Facebook. For Instagram Login, use Connect Instagram."},
         ],
     },
     "Facebook": {
