@@ -24,6 +24,7 @@ jobs:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       SUPABASE_MEDIA_BUCKET: ${{ secrets.SUPABASE_MEDIA_BUCKET }}
+      PUBLICATION_LOOKBACK_MINUTES: "180"
       FLASK_DEBUG: "0"
     steps:
       - name: Check out repository

@@ -212,7 +212,15 @@ Recommended schedule:
 */5 * * * *
 ```
 
-GitHub Actions schedules are not a permanently running worker, so publication is processed in short polling intervals. Any post or recycled schedule with `scheduled_at` less than or equal to the app's current time is picked up on the next run. In practice, a post scheduled for `14:00` should publish on the `14:00` or `14:05` run, depending on GitHub runner timing.
+GitHub Actions schedules are not a permanently running worker, so publication is processed in short polling intervals. Any post or recycled schedule with `scheduled_at` less than or equal to the app's current time is picked up on the next run, as long as it is inside the configured lookback window. In practice, a post scheduled for `14:00` should publish on the `14:00` or `14:05` run, depending on GitHub runner timing.
+
+The workflow currently sets:
+
+```txt
+PUBLICATION_LOOKBACK_MINUTES=180
+```
+
+That gives the job a 3-hour catch-up window while avoiding accidental publication of very old scheduled posts.
 
 Set these additional GitHub Actions repository secrets if scheduled publishing uses media uploads:
 

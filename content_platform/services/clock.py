@@ -1,4 +1,5 @@
 from datetime import datetime
+from datetime import timedelta
 import os
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -16,3 +17,7 @@ def app_now():
 
 def app_now_string():
     return app_now().strftime("%Y-%m-%dT%H:%M")
+
+
+def app_minutes_ago_string(minutes):
+    return (app_now() - timedelta(minutes=minutes)).strftime("%Y-%m-%dT%H:%M")

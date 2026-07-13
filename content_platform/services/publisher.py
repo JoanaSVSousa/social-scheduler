@@ -1,14 +1,18 @@
+import os
+
 from ..models import FORMAT_MEDIA_RULES
 from .media import get_media_for_post
 from .media_optimizer import prepare_media_for_publish
 from .platform_publishers import is_platform_publishable, publish_to_platform
 from .scheduler import add_log, get_due_posts, get_post, mark_post_status
 from .schedules import get_due_schedules, mark_schedule_status
+from .clock import app_minutes_ago_string
 
 
 def process_publication_queue():
-    due_posts = get_due_posts()
-    due_schedules = get_due_schedules()
+    not_before = _publication_not_before()
+    due_posts = get_due_posts(not_before=not_before)
+    due_schedules = get_due_schedules(not_before=not_before)
     published = 0
 
     for schedule in due_schedules:
@@ -28,6 +32,19 @@ def process_publication_queue():
         add_log(None, "INFO", "Publication queue checked. No posts due.")
 
     return published
+
+
+def _publication_not_before():
+    value = os.environ.get("PUBLICATION_LOOKBACK_MINUTES", "").strip()
+    if not value:
+        return None
+    try:
+        minutes = int(value)
+    except ValueError:
+        return None
+    if minutes <= 0:
+        return None
+    return app_minutes_ago_string(minutes)
 
 
 def publish_post_now(post_id):

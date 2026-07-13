@@ -202,22 +202,29 @@ def delete_post(post_id):
     add_log(None, "INFO", f"Post #{post_id} deleted.")
 
 
-def get_due_posts():
+def get_due_posts(not_before=None):
     now = app_now_string()
+    window_filter = ""
+    params = [now]
+    if not_before:
+        window_filter = "AND scheduled_at >= ?"
+        params.append(not_before)
+
     with get_connection() as conn:
         return conn.execute(
-            """
+            f"""
             SELECT * FROM posts
             WHERE status = 'Scheduled'
               AND scheduled_at IS NOT NULL
               AND scheduled_at <= ?
+              {window_filter}
               AND NOT EXISTS (
                   SELECT 1 FROM post_schedules
                   WHERE post_schedules.post_id = posts.id
               )
             ORDER BY scheduled_at ASC
             """,
-            (now,),
+            params,
         ).fetchall()
 
 

@@ -41,19 +41,26 @@ def get_schedules_for_posts(post_ids):
     return schedules_by_post
 
 
-def get_due_schedules():
+def get_due_schedules(not_before=None):
     now = app_now_string()
+    window_filter = ""
+    params = [now]
+    if not_before:
+        window_filter = "AND post_schedules.scheduled_at >= ?"
+        params.append(not_before)
+
     with get_connection() as conn:
         return conn.execute(
-            """
+            f"""
             SELECT post_schedules.*, posts.title, posts.platform
             FROM post_schedules
             JOIN posts ON posts.id = post_schedules.post_id
             WHERE post_schedules.status = 'Scheduled'
               AND post_schedules.scheduled_at <= ?
+              {window_filter}
             ORDER BY post_schedules.scheduled_at ASC
             """,
-            (now,),
+            params,
         ).fetchall()
 
 
