@@ -947,7 +947,13 @@ def connect_instagram_account():
         {
             "client_id": app_id,
             "redirect_uri": redirect_uri,
-            "scope": "instagram_business_basic,instagram_business_content_publish",
+            "scope": (
+                "instagram_business_basic,"
+                "instagram_business_manage_messages,"
+                "instagram_business_manage_comments,"
+                "instagram_business_content_publish,"
+                "instagram_business_manage_insights"
+            ),
             "response_type": "code",
             "state": state,
             "enable_fb_login": "0",
