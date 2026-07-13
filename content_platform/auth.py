@@ -41,6 +41,6 @@ def login_required(view):
 
 
 def should_require_login(endpoint):
-    if endpoint in {None, "main.login", "static"}:
+    if endpoint in {None, "healthz", "main.login", "static"}:
         return False
     return True

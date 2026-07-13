@@ -2,7 +2,7 @@ from pathlib import Path
 import os
 from secrets import token_urlsafe
 
-from flask import Flask, redirect, request, url_for
+from flask import Flask, jsonify, redirect, request, url_for
 
 from .auth import is_logged_in, should_require_login
 from .database import DEFAULT_DB_PATH, init_db
@@ -33,6 +33,10 @@ def create_app():
     def require_app_login():
         if should_require_login(request.endpoint) and not is_logged_in():
             return redirect(url_for("main.login", next=request.path))
+
+    @app.get("/healthz")
+    def healthz():
+        return jsonify({"ok": True})
 
     app.register_blueprint(bp)
 

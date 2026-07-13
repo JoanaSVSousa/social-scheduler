@@ -97,6 +97,7 @@ CREDENTIALS_ENCRYPTION_KEY="generated-fernet-key"
 ADMIN_USERNAME="SquaredRedes"
 ADMIN_PASSWORD="strong-password"
 DATABASE_URL="postgresql://USER:PASSWORD@POOLER_HOST:6543/postgres?sslmode=require"
+APP_BASE_URL="https://your-render-service.onrender.com"
 ```
 
 For public media uploads:
@@ -152,7 +153,13 @@ RSS duplicate protection uses the source URL, so a future general feed should no
 
 ## Recurring RSS Task
 
-On Render, create a Cron Job that runs every 2 hours:
+The repository includes a GitHub Actions workflow that runs hourly:
+
+```txt
+.github/workflows/rss-check.yml
+```
+
+It runs:
 
 ```bash
 python3 scripts/check_rss_feeds.py
@@ -161,10 +168,29 @@ python3 scripts/check_rss_feeds.py
 Recommended schedule:
 
 ```txt
-0 */2 * * *
+0 * * * *
 ```
 
-The Cron Job must use the same environment variables as the web service, especially `DATABASE_URL`.
+The scheduled workflow must use the same database as the web service, so `DATABASE_URL` must match the Render web service value.
+
+Set these GitHub Actions repository secrets:
+
+- `APP_BASE_URL`
+- `DATABASE_URL`
+- `SECRET_KEY`
+- `CREDENTIALS_ENCRYPTION_KEY`
+- `ADMIN_USERNAME`
+- `ADMIN_PASSWORD`
+
+`APP_BASE_URL` should be the public Render URL, for example:
+
+```txt
+https://your-render-service.onrender.com
+```
+
+When `APP_BASE_URL` is set, the RSS job first calls `/healthz` to wake/check the web service, then imports new RSS items as draft posts. It does not publish scheduled posts; queue publishing should be added as a separate scheduled workflow when that process is ready.
+
+Render Cron Jobs can also run the same command if the account plan supports them. In that case, the cron service needs the same environment variables as the web service, especially `DATABASE_URL` and `APP_BASE_URL`.
 
 ## Media Workflow
 
