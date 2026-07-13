@@ -159,10 +159,10 @@ def publish_to_instagram(post, media_items):
 
     credentials = account["credentials"]
     instagram_id = credentials.get("instagram_business_id") or account.get("account_handle")
-    access_token = credentials.get("access_token")
+    graph_base_url = _instagram_graph_base_url(account, credentials)
+    access_token = _instagram_access_token(account, credentials)
     if not instagram_id or not access_token:
         raise PublicationError("Instagram needs an Instagram Business ID and a Meta access token with content publishing permissions.")
-    graph_base_url = _instagram_graph_base_url(account, credentials)
 
     normalized_format = (post["content_format"] or "").lower()
     public_media = _first_public_media(media_items)
@@ -220,6 +220,15 @@ def _instagram_graph_base_url(account, credentials):
     if auth_type == "meta_graph" or credentials.get("facebook_page_id"):
         return "https://graph.facebook.com/v20.0"
     return "https://graph.instagram.com/v20.0"
+
+
+def _instagram_access_token(account, credentials):
+    auth_type = (account.get("auth_type") or "").lower()
+    if auth_type == "meta_graph" or credentials.get("facebook_page_id"):
+        facebook_account = decrypt_credentials_for_publisher("Facebook")
+        facebook_credentials = (facebook_account or {}).get("credentials", {})
+        return facebook_credentials.get("access_token") or credentials.get("access_token")
+    return credentials.get("access_token")
 
 
 def publish_to_linkedin(post, media_items):

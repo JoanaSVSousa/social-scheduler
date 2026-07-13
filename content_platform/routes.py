@@ -1230,6 +1230,10 @@ def _verify_facebook_account(credentials):
 def _verify_instagram_account(credentials):
     instagram_id = credentials.get("instagram_business_id", "")
     access_token = credentials.get("access_token", "")
+    if credentials.get("facebook_page_id"):
+        facebook_account = decrypt_credentials_for_publisher("Facebook")
+        facebook_credentials = (facebook_account or {}).get("credentials", {})
+        access_token = facebook_credentials.get("access_token") or access_token
     if not instagram_id or not access_token:
         raise RuntimeError("Instagram needs Instagram Business ID and Access Token.")
 

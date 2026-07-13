@@ -35,7 +35,7 @@ SOCIAL_ACCOUNT_SCHEMAS = {
             {"name": "app_secret", "label": "Instagram App Secret", "placeholder": "Instagram app secret", "example": "Only the secret stays hidden after saving."},
             {"name": "instagram_business_id", "label": "Instagram User ID", "placeholder": "Instagram Business/Creator ID", "example": "The numeric Instagram professional account ID linked to the Facebook Page."},
             {"name": "facebook_page_id", "label": "Linked Facebook Page ID", "placeholder": "Facebook Page ID", "example": "Recommended for the Facebook Page token flow. Example: 123456789012345."},
-            {"name": "access_token", "label": "Long-lived Access Token", "placeholder": "Paste Page token or connect Instagram", "example": "For Facebook Page token auth, paste the same long-lived Page Access Token that publishes to Facebook. For Instagram Login, use Connect Instagram."},
+            {"name": "access_token", "label": "Long-lived Access Token", "placeholder": "Optional when Facebook card is connected", "example": "For Facebook Page token auth, this can stay blank because the app reuses the token saved in the Facebook card. For Instagram Login, use Connect Instagram."},
         ],
     },
     "Facebook": {
