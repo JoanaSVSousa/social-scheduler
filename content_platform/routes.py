@@ -83,6 +83,7 @@ from .services.squared_feeds import SQUARED_FEEDS
 bp = Blueprint("main", __name__)
 NEWS_REPEAT_COUNT = "3"
 NEWS_REPEAT_INTERVAL_DAYS = "2"
+META_GRAPH_TIMEOUT_SECONDS = 8
 
 
 @bp.route("/")
@@ -1229,13 +1230,13 @@ def _format_meta_expiry(expires_at):
 def _meta_get_json(url, params, endpoint_name):
     request_url = f"{url}?{urlencode(params)}"
     try:
-        with urlopen(Request(request_url, method="GET"), timeout=20) as response:
+        with urlopen(Request(request_url, method="GET"), timeout=META_GRAPH_TIMEOUT_SECONDS) as response:
             return json.loads(response.read().decode("utf-8"))
     except HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
         raise RuntimeError(f"{endpoint_name} error {exc.code}: {_clean_meta_error(detail)}") from exc
     except (URLError, TimeoutError, ValueError, json.JSONDecodeError) as exc:
-        raise RuntimeError(f"{endpoint_name} failed: {exc}") from exc
+        raise RuntimeError(f"{endpoint_name} failed or timed out while contacting Meta: {exc}") from exc
 
 
 def _clean_meta_error(detail):
