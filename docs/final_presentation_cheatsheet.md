@@ -4,7 +4,7 @@ Este ficheiro e para memorizar rapidamente antes de apresentar.
 
 ## 1. Pitch de 20 segundos
 
-> O meu projeto e uma Content Automation Platform em Python e Flask. Permite gerir posts para varias redes sociais, importar artigos por RSS, adaptar versoes por plataforma, anexar media, agendar, reciclar conteudo, publicar por API e consultar logs.
+> O meu projeto chama-se Supernova e foi desenvolvido em Python e Flask. Permite gerir posts para varias redes sociais, importar artigos por RSS, adaptar versoes por plataforma, anexar media, agendar, reciclar conteudo, publicar por API e consultar logs.
 
 ## 2. Pitch de 1 minuto
 

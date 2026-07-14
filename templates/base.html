@@ -3,12 +3,17 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Content Automation Platform</title>
+    <title>Supernova</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body class="dark-theme">
     <header class="topbar">
-        <a class="brand" href="{{ url_for('main.dashboard') }}">Content Automation Platform</a>
+        <a class="brand" href="{{ url_for('main.dashboard') }}">
+            <img src="{{ url_for('static', filename='supernova-icon.png') }}" alt="" class="brand-mark">
+            <span>Supernova</span>
+        </a>
         <nav>
             <a href="{{ url_for('main.dashboard') }}">Dashboard</a>
             <a href="{{ url_for('main.posts') }}">Posts</a>

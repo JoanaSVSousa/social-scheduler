@@ -43,7 +43,7 @@ DEMO_POSTS = [
     ),
     Post(
         title="LinkedIn product note",
-        content="Professional summary of the Content Automation Platform architecture.",
+        content="Professional summary of the Supernova architecture.",
         hashtags="#python #flask #automation",
         platform="LinkedIn",
         content_format="Text Post",

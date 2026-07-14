@@ -18,7 +18,7 @@ def build_dashboard_report(limit=12):
     status_counts = build_status_counts(posts)
 
     lines = [
-        "Content Automation Platform - Daily Report",
+        "Supernova - Daily Report",
         f"Generated at: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
         "",
         "Dashboard",
@@ -97,7 +97,7 @@ def send_dashboard_report():
     to_email = os.environ["REPORT_TO_EMAIL"]
 
     message = EmailMessage()
-    message["Subject"] = os.environ.get("REPORT_EMAIL_SUBJECT", "Content Automation Platform report")
+    message["Subject"] = os.environ.get("REPORT_EMAIL_SUBJECT", "Supernova report")
     message["From"] = from_email
     message["To"] = to_email
     message.set_content(build_dashboard_report())

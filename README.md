@@ -1,4 +1,4 @@
-# Content Automation Platform
+# Supernova
 
 A Flask + Python platform for planning, adapting, scheduling, and publishing content across multiple social networks.
 
@@ -6,7 +6,7 @@ This project started as an academic scheduling project and evolved into an autom
 
 ## Elevator Pitch
 
-Content Automation Platform helps a small team manage the full publication workflow:
+Supernova helps a small team manage the full publication workflow:
 
 ```txt
 RSS/article discovery

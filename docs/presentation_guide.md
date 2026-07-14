@@ -1,4 +1,4 @@
-# Content Automation Platform - Guia de Apresentacao
+# Supernova - Guia de Apresentacao
 
 Este documento e um guiao para apresentar o projeto em aula ou numa entrevista. A ideia e ajudar-te a explicar o projeto sem depender de memoria perfeita.
 
@@ -6,7 +6,7 @@ Este documento e um guiao para apresentar o projeto em aula ou numa entrevista. 
 
 Frase para dizer:
 
-> O meu projeto chama-se Content Automation Platform. E uma aplicacao em Python e Flask para planear, adaptar, agendar e publicar conteudo em varias redes sociais.
+> O meu projeto chama-se Supernova. E uma aplicacao em Python e Flask para planear, adaptar, agendar e publicar conteudo em varias redes sociais.
 
 Versao mais simples:
 

@@ -204,6 +204,8 @@ def publish_to_instagram(post, media_items):
     if not creation_id:
         raise PublicationError("Instagram did not return a media container id.")
 
+    _wait_for_instagram_container(graph_base_url, creation_id, access_token)
+
     response = _post_form(
         f"{graph_base_url}/{instagram_id}/media_publish",
         {"creation_id": creation_id, "access_token": access_token},
@@ -218,6 +220,26 @@ def _instagram_graph_connection(account, credentials):
     facebook_account = decrypt_credentials_for_publisher("Facebook")
     facebook_credentials = (facebook_account or {}).get("credentials", {})
     return "https://graph.facebook.com/v20.0", facebook_credentials.get("access_token", "")
+
+
+def _wait_for_instagram_container(graph_base_url, creation_id, access_token):
+    for attempt in range(10):
+        status = _get_json(
+            f"{graph_base_url}/{creation_id}",
+            {"fields": "status_code,status", "access_token": access_token},
+            endpoint_name="Instagram media status",
+            error_label="Instagram API",
+        )
+        status_code = (status.get("status_code") or "").upper()
+        if status_code == "FINISHED":
+            return
+        if status_code == "ERROR":
+            detail = status.get("status") or "Meta reported an error while preparing this Instagram media."
+            raise PublicationError(f"Instagram media container failed before publishing: {detail}")
+        if not status_code and attempt == 0:
+            return
+        time.sleep(3)
+    raise PublicationError("Instagram media is still processing. Try publishing again in a moment.")
 
 
 def publish_to_linkedin(post, media_items):
@@ -700,6 +722,13 @@ def _post_form(url, payload, endpoint_name="request", error_label="API"):
     data = urlencode(payload).encode("utf-8")
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
     return _request_json(Request(url, data=data, headers=headers, method="POST"), endpoint_name, error_label)
+
+
+def _get_json(url, params=None, endpoint_name="request", error_label="API"):
+    query = urlencode(params or {})
+    separator = "&" if "?" in url else "?"
+    request_url = f"{url}{separator}{query}" if query else url
+    return _request_json(Request(request_url, method="GET"), endpoint_name, error_label)
 
 
 def _post_bytes(url, payload, content_type, access_jwt, endpoint_name="request", error_label="Bluesky API"):
