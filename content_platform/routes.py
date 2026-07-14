@@ -84,6 +84,21 @@ bp = Blueprint("main", __name__)
 NEWS_REPEAT_COUNT = "3"
 NEWS_REPEAT_INTERVAL_DAYS = "2"
 META_GRAPH_TIMEOUT_SECONDS = 8
+FACEBOOK_OAUTH_SCOPES = [
+    "pages_show_list",
+    "pages_read_engagement",
+    "pages_manage_posts",
+    "instagram_basic",
+    "instagram_content_publish",
+]
+FACEBOOK_REQUIRED_SCOPES = [
+    "pages_read_engagement",
+    "pages_manage_posts",
+]
+INSTAGRAM_REQUIRED_SCOPES = [
+    "instagram_basic",
+    "instagram_content_publish",
+]
 
 
 @bp.route("/")
@@ -801,7 +816,7 @@ def connect_facebook_account():
         {
             "client_id": app_id,
             "redirect_uri": redirect_uri,
-            "scope": "pages_show_list,pages_read_engagement,pages_manage_posts",
+            "scope": ",".join(FACEBOOK_OAUTH_SCOPES),
             "response_type": "code",
             "state": state,
         }
@@ -1077,7 +1092,7 @@ def _verify_facebook_account(credentials):
         raise RuntimeError(
             "Page is readable, but publish scopes were not checked because Facebook App ID/App Secret are not saved in this Facebook card."
         )
-    missing_scopes = [scope for scope in ["pages_read_engagement", "pages_manage_posts"] if scope not in scopes]
+    missing_scopes = [scope for scope in FACEBOOK_REQUIRED_SCOPES if scope not in scopes]
     if scopes and missing_scopes:
         raise RuntimeError(f"Token is readable, but missing scopes: {', '.join(missing_scopes)}.")
     details.append("publish scopes are present")
@@ -1098,12 +1113,25 @@ def _verify_instagram_account(credentials):
     if not access_token:
         raise RuntimeError("Instagram uses the Facebook Page token. Connect Facebook first, then verify Instagram.")
 
+    scopes = _meta_token_scopes(facebook_credentials)
+    missing_scopes = [scope for scope in INSTAGRAM_REQUIRED_SCOPES if scope not in scopes]
+    if missing_scopes:
+        raise RuntimeError(
+            "The saved Facebook Page token can publish to Facebook, but is missing Instagram permissions: "
+            f"{', '.join(missing_scopes)}. Use Connect Facebook again and accept Instagram access."
+        )
+
     page = _meta_get_json(
         f"https://graph.facebook.com/v20.0/{page_id}",
         {"fields": "id,name,instagram_business_account{id,username}", "access_token": access_token},
         "Instagram linked Page lookup",
     )
     linked_instagram = page.get("instagram_business_account") or {}
+    if not linked_instagram:
+        raise RuntimeError(
+            f"Facebook Page {page.get('name') or page.get('id')} is readable, but Meta did not return a linked Instagram professional account. "
+            "Confirm the Instagram account is connected to this Facebook Page in Meta Business Suite, then use Connect Facebook again."
+        )
     if linked_instagram and str(linked_instagram.get("id", "")) != str(instagram_id):
         raise RuntimeError(
             "The saved Facebook Page token is linked to Instagram ID "
@@ -1134,7 +1162,7 @@ def _generate_long_lived_facebook_page_token(page_id, app_id, app_secret, short_
         app_id=app_id,
         app_secret=app_secret,
         short_lived_user_token=short_lived_user_token,
-        required_scopes=["pages_read_engagement", "pages_manage_posts"],
+        required_scopes=FACEBOOK_REQUIRED_SCOPES + INSTAGRAM_REQUIRED_SCOPES,
         lookup_label="Facebook",
     )
 
