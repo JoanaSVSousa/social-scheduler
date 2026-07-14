@@ -10,7 +10,8 @@
     <a class="button" href="{{ url_for('main.dashboard') }}">Back to dashboard</a>
 </div>
 
-{% set shared_meta_callback_url = url_for('main.meta_oauth_callback', _external=True) %}
+{% set shared_meta_callback_url = oauth_callback_urls.get("meta") %}
+{% set threads_callback_url = oauth_callback_urls.get("threads") %}
 
 <section class="dashboard-platforms">
     <div class="platform-list platform-list-wide social-account-grid">
@@ -94,16 +95,24 @@
             {% if platform == "Threads" and account %}
             <form method="post" action="{{ url_for('main.connect_threads_account') }}" class="social-account-form">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <p class="field-help">OAuth callback URL for Meta: {{ url_for('main.threads_oauth_callback', _external=True) }}</p>
+                <label>
+                    Threads OAuth callback
+                    <input class="readonly-copy-field" type="text" readonly value="{{ threads_callback_url }}" onclick="this.select()">
+                    <span class="field-help">
+                        Add this exact URL, without a trailing slash, in the Threads API OAuth callback settings. App domain: {{ request.host }}.
+                    </span>
+                </label>
                 <button class="button primary" type="submit">Connect Threads</button>
             </form>
             {% endif %}
-            {% if platform in ["Facebook", "Instagram"] and account %}
+            {% if platform in ["Facebook", "Instagram", "Threads"] and account %}
             <form method="post" action="{{ url_for('main.verify_social_account_settings', platform=platform) }}" class="social-account-form">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <p class="field-help">
                     {% if platform == "Instagram" %}
                     Checks whether the Facebook Page token can read the linked Instagram account before publishing.
+                    {% elif platform == "Threads" %}
+                    Checks whether the saved Threads user token can read this Threads account before publishing.
                     {% else %}
                     Checks whether the saved Page token can read this Facebook Page before publishing.
                     {% endif %}

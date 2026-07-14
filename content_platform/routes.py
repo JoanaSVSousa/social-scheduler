@@ -140,6 +140,10 @@ def social_account_settings():
             platform: credential_metadata(account) for platform, account in social_accounts.items()
         },
         social_account_schemas=SOCIAL_ACCOUNT_SCHEMAS,
+        oauth_callback_urls={
+            "meta": _external_oauth_url("main.meta_oauth_callback"),
+            "threads": _external_oauth_url("main.threads_oauth_callback"),
+        },
         platforms=PLATFORMS,
     )
 
@@ -956,7 +960,7 @@ def connect_threads_account():
 
     state = secrets.token_urlsafe(24)
     session["threads_oauth_state"] = state
-    redirect_uri = url_for("main.threads_oauth_callback", _external=True)
+    redirect_uri = _external_oauth_url("main.threads_oauth_callback")
     authorization_url = "https://threads.net/oauth/authorize?" + urlencode(
         {
             "client_id": app_id,
@@ -989,7 +993,7 @@ def threads_oauth_callback():
         flash("Threads App ID/App Secret are missing. Save them and connect again.", "warning")
         return redirect(url_for("main.social_account_settings"))
 
-    redirect_uri = url_for("main.threads_oauth_callback", _external=True)
+    redirect_uri = _external_oauth_url("main.threads_oauth_callback")
     try:
         token_payload = _exchange_threads_authorization_code(app_id, app_secret, code, redirect_uri)
     except RuntimeError as exc:
@@ -1060,7 +1064,9 @@ def _verify_social_account(account):
         return _verify_facebook_account(credentials)
     if platform == "Instagram":
         return _verify_instagram_account(credentials)
-    raise RuntimeError("Credential verification is currently available for Facebook and Instagram.")
+    if platform == "Threads":
+        return _verify_threads_account(credentials)
+    raise RuntimeError("Credential verification is currently available for Facebook, Instagram, and Threads.")
 
 
 def _verify_facebook_account(credentials):
@@ -1146,6 +1152,25 @@ def _verify_instagram_account(credentials):
         f"Instagram account {account.get('username') or account.get('id')} is readable "
         f"through Facebook Page {page.get('name') or page.get('id')}."
     )
+
+
+def _verify_threads_account(credentials):
+    threads_user_id = credentials.get("threads_user_id", "")
+    access_token = credentials.get("access_token", "")
+    if not threads_user_id or not access_token:
+        raise RuntimeError("Threads needs Threads User ID and User Access Token.")
+
+    account = _meta_get_json(
+        f"https://graph.threads.net/v1.0/{threads_user_id}",
+        {"fields": "id,username,name", "access_token": access_token},
+        "Threads account lookup",
+    )
+    if str(account.get("id", "")) != str(threads_user_id):
+        raise RuntimeError(
+            "The Threads token is readable, but it belongs to Threads ID "
+            f"{account.get('id')}, not the configured ID {threads_user_id}."
+        )
+    return f"Threads account {account.get('username') or account.get('name') or account.get('id')} is readable."
 
 
 def _external_oauth_url(endpoint):
