@@ -1,5 +1,5 @@
 from ..database import get_connection, insert_and_get_id
-from ..models import default_content_format, truncate_content_for_platform
+from ..models import PLATFORM_CONTENT_FORMATS, default_content_format, truncate_content_for_platform
 from .clock import app_now_string
 
 
@@ -84,6 +84,47 @@ def update_post(post_id, post):
         )
 
     add_log(post_id, "INFO", f"Post updated with status {post.status}.")
+
+
+def update_library_post_fields(post_ids, platform="", source_type="", content_format=""):
+    post_ids = [int(post_id) for post_id in post_ids if str(post_id).isdigit()]
+    if not post_ids:
+        return 0
+
+    updated = 0
+    with get_connection() as conn:
+        for post_id in post_ids:
+            post = conn.execute(
+                "SELECT * FROM posts WHERE id = ? AND rss_item_id IS NULL",
+                (post_id,),
+            ).fetchone()
+            if post is None:
+                continue
+
+            next_platform = platform or post["platform"]
+            next_source_type = source_type or post["source_type"]
+            next_content_format = content_format or post["content_format"]
+            if platform and not content_format:
+                next_content_format = default_content_format(next_platform)
+            if next_content_format not in PLATFORM_CONTENT_FORMATS.get(next_platform, []):
+                continue
+            next_content = truncate_content_for_platform(next_platform, post["content"], post["hashtags"])
+
+            conn.execute(
+                """
+                UPDATE posts
+                SET platform = ?, source_type = ?, content_format = ?, content = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (next_platform, next_source_type, next_content_format, next_content, post_id),
+            )
+            conn.execute(
+                "INSERT INTO logs (post_id, level, message) VALUES (?, ?, ?)",
+                (post_id, "INFO", "Post library fields updated from Posts page."),
+            )
+            updated += 1
+
+    return updated
 
 
 def clone_post_to_platforms(post_id, platforms):

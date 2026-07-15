@@ -29,6 +29,12 @@
         <option value="{{ source_type }}" {% if filters.source_type == source_type %}selected{% endif %}>{{ source_type }}</option>
         {% endfor %}
     </select>
+    <select name="media_kind">
+        <option value="">All formats</option>
+        {% for value, label in media_kinds.items() %}
+        <option value="{{ value }}" {% if filters.media_kind == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
     <select name="sort">
         {% for value, label in sort_options.items() %}
         <option value="{{ value }}" {% if filters.sort == value %}selected{% endif %}>{{ label }}</option>
@@ -37,31 +43,64 @@
     <button class="button" type="submit">Filter</button>
 </form>
 
+<form id="bulk-posts-form" class="bulk-toolbar" method="post" action="{{ url_for('main.update_posts_library') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="action" value="bulk_update">
+    <input type="hidden" name="return_search" value="{{ filters.search }}">
+    <input type="hidden" name="return_platform" value="{{ filters.platform }}">
+    <input type="hidden" name="return_status" value="{{ filters.status }}">
+    <input type="hidden" name="return_source_type" value="{{ filters.source_type }}">
+    <input type="hidden" name="return_media_kind" value="{{ filters.media_kind }}">
+    <input type="hidden" name="return_sort" value="{{ filters.sort }}">
+    <span class="bulk-count" data-selected-count>0 selected</span>
+    <select name="platform" data-bulk-platform>
+        <option value="">Keep platform</option>
+        {% for platform in platforms %}
+        <option value="{{ platform }}">{{ platform }}</option>
+        {% endfor %}
+    </select>
+    <select name="source_type">
+        <option value="">Keep type</option>
+        {% for source_type in source_types %}
+        <option value="{{ source_type }}">{{ source_type }}</option>
+        {% endfor %}
+    </select>
+    <select name="content_format" data-bulk-format>
+        <option value="">Keep format</option>
+        {% for platform, formats in content_formats.items() %}
+            {% for format in formats %}
+            <option value="{{ format }}" data-platform="{{ platform }}">{{ platform }} · {{ format }}</option>
+            {% endfor %}
+        {% endfor %}
+    </select>
+    <button class="button" type="submit">Apply</button>
+</form>
+
 <div class="table-wrap posts-table-wrap">
     <table class="posts-table">
         <colgroup>
+            <col class="post-col-select">
+            <col class="post-col-format">
             <col class="post-col-title">
             <col class="post-col-platform">
-            <col class="post-col-format">
             <col class="post-col-status">
             <col class="post-col-type">
             <col class="post-col-media">
-            <col class="post-col-schedules">
-            <col class="post-col-scheduled">
+            <col class="post-col-schedule">
             <col class="post-col-added">
             <col class="post-col-hashtags">
             <col class="post-col-actions">
         </colgroup>
         <thead>
             <tr>
+                <th><input type="checkbox" data-select-all aria-label="Select all regular posts"></th>
+                <th>Format</th>
                 <th>Title</th>
                 <th>Platform</th>
-                <th>Format</th>
                 <th>Status</th>
                 <th>Type</th>
                 <th>Media</th>
-                <th>Schedules</th>
-                <th>Scheduled</th>
+                <th>Schedule</th>
                 <th>Added</th>
                 <th>Hashtags</th>
                 <th></th>
@@ -70,6 +109,15 @@
         <tbody>
             {% for post in posts %}
             <tr>
+                <td>
+                    {% if not post.is_rss_group %}
+                    <input type="checkbox" name="selected_post_ids" value="{{ post.id }}" form="bulk-posts-form" data-row-select aria-label="Select {{ post.title }}">
+                    {% endif %}
+                </td>
+                <td>
+                    <span class="format-badge {{ post.library_kind }}">{{ post.library_kind_label }}</span>
+                    <small class="format-caption">{{ post.content_format }}</small>
+                </td>
                 <td class="post-title-cell">
                     {% if post.is_rss_group %}
                     <a class="table-link post-title-link" href="{{ url_for('main.edit_rss_article', rss_item_id=post.rss_item_id) }}">{{ post.title }}</a>
@@ -80,9 +128,29 @@
                     <small class="post-excerpt">{{ post.content[:260] }}{% if post.content|length > 260 %}...{% endif %}</small>
                 </td>
                 <td>{{ post.platform }}</td>
-                <td>{{ post.content_format }}</td>
                 <td><span class="status {{ post.status|lower }}">{{ post.status }}</span></td>
-                <td><span class="type-pill {{ post.source_type|lower }}">{{ post.source_type }}</span></td>
+                <td>
+                    {% if post.is_rss_group %}
+                    <span class="type-pill {{ post.source_type|lower }}">{{ post.source_type }}</span>
+                    {% else %}
+                    <form class="inline-select-form" method="post" action="{{ url_for('main.update_posts_library') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="action" value="quick_source">
+                        <input type="hidden" name="post_id" value="{{ post.id }}">
+                        <input type="hidden" name="return_search" value="{{ filters.search }}">
+                        <input type="hidden" name="return_platform" value="{{ filters.platform }}">
+                        <input type="hidden" name="return_status" value="{{ filters.status }}">
+                        <input type="hidden" name="return_source_type" value="{{ filters.source_type }}">
+                        <input type="hidden" name="return_media_kind" value="{{ filters.media_kind }}">
+                        <input type="hidden" name="return_sort" value="{{ filters.sort }}">
+                        <select name="source_type" class="compact-select {{ post.source_type|lower }}" onchange="this.form.submit()">
+                            {% for source_type in source_types %}
+                            <option value="{{ source_type }}" {% if post.source_type == source_type %}selected{% endif %}>{{ source_type }}</option>
+                            {% endfor %}
+                        </select>
+                    </form>
+                    {% endif %}
+                </td>
                 <td>
                     {% if post.is_rss_group %}
                     <span class="media-count">{{ post.media_total }} file{% if post.media_total != 1 %}s{% endif %}</span>
@@ -98,30 +166,16 @@
                         {% endif %}
                     </div>
                     {% else %}
-                    <span class="muted">No media</span>
+                    <span class="muted">No files</span>
                     {% endif %}
                     {% endif %}
                 </td>
                 <td>
-                    {% if post.is_rss_group %}
-                    <span class="media-count">{{ post.schedule_total }} date{% if post.schedule_total != 1 %}s{% endif %}</span>
-                    {% else %}
-                    {% set schedule_items = schedules_by_post.get(post.id, []) %}
-                    {% if schedule_items %}
-                    <div class="media-strip">
-                        {% for item in schedule_items[:2] %}
-                        <span class="media-pill">{{ item.scheduled_at }}</span>
-                        {% endfor %}
-                        {% if schedule_items|length > 2 %}
-                        <span class="media-pill">+{{ schedule_items|length - 2 }}</span>
-                        {% endif %}
-                    </div>
-                    {% else %}
-                    <span class="muted">No recycling</span>
-                    {% endif %}
+                    <span class="{% if post.schedule_label == 'Not scheduled' %}muted{% else %}schedule-value{% endif %}">{{ post.schedule_label }}</span>
+                    {% if post.schedule_extra %}
+                    <span class="media-pill">+{{ post.schedule_extra }}</span>
                     {% endif %}
                 </td>
-                <td>{{ post.scheduled_at or "Not scheduled" }}</td>
                 <td>{{ post.created_at }}</td>
                 <td>{{ post.hashtags }}</td>
                 <td class="actions">
@@ -161,6 +215,53 @@
     </table>
 </div>
 <script>
+const allCheckbox = document.querySelector("[data-select-all]");
+const rowCheckboxes = Array.from(document.querySelectorAll("[data-row-select]"));
+const selectedCount = document.querySelector("[data-selected-count]");
+function updateSelectedCount() {
+    const checked = rowCheckboxes.filter((checkbox) => checkbox.checked).length;
+    if (selectedCount) {
+        selectedCount.textContent = `${checked} selected`;
+    }
+    if (allCheckbox) {
+        allCheckbox.checked = checked > 0 && checked === rowCheckboxes.length;
+        allCheckbox.indeterminate = checked > 0 && checked < rowCheckboxes.length;
+    }
+}
+if (allCheckbox) {
+    allCheckbox.addEventListener("change", () => {
+        rowCheckboxes.forEach((checkbox) => {
+            checkbox.checked = allCheckbox.checked;
+        });
+        updateSelectedCount();
+    });
+}
+rowCheckboxes.forEach((checkbox) => checkbox.addEventListener("change", updateSelectedCount));
+updateSelectedCount();
+
+const bulkPlatform = document.querySelector("[data-bulk-platform]");
+const bulkFormat = document.querySelector("[data-bulk-format]");
+function syncBulkFormats() {
+    if (!bulkFormat) {
+        return;
+    }
+    const platform = bulkPlatform ? bulkPlatform.value : "";
+    Array.from(bulkFormat.options).forEach((option) => {
+        if (!option.value) {
+            option.hidden = false;
+            return;
+        }
+        option.hidden = Boolean(platform) && option.dataset.platform !== platform;
+    });
+    if (bulkFormat.selectedOptions[0]?.hidden) {
+        bulkFormat.value = "";
+    }
+}
+if (bulkPlatform) {
+    bulkPlatform.addEventListener("change", syncBulkFormats);
+    syncBulkFormats();
+}
+
 document.querySelectorAll("[data-x-composer]").forEach((link) => {
     link.addEventListener("click", (event) => {
         event.preventDefault();

@@ -64,6 +64,7 @@ from .services.scheduler import (
     move_post_schedule_date,
     update_post_text,
     update_post,
+    update_library_post_fields,
 )
 from .services.social_accounts import (
     SOCIAL_ACCOUNT_SCHEMAS,
@@ -184,11 +185,18 @@ def social_account_settings():
 def posts():
     refresh_rss_content_types()
     source_types = ["Regular", "News"]
+    media_kinds = {
+        "story": "Stories",
+        "video": "Videos",
+        "image": "Images",
+        "text": "Text",
+    }
     sort_options = _post_sort_options()
     filters = {
         "status": request.args.get("status", ""),
         "platform": request.args.get("platform", ""),
         "source_type": request.args.get("source_type", ""),
+        "media_kind": request.args.get("media_kind", ""),
         "search": request.args.get("search", ""),
         "sort": request.args.get("sort", "scheduled_asc"),
     }
@@ -198,12 +206,17 @@ def posts():
         filters["platform"] = ""
     if filters["source_type"] and filters["source_type"] not in source_types:
         filters["source_type"] = ""
+    if filters["media_kind"] and filters["media_kind"] not in media_kinds:
+        filters["media_kind"] = ""
     if filters["sort"] not in sort_options:
         filters["sort"] = "scheduled_asc"
     filtered_posts = get_all_posts(filters)
     media_by_post = get_media_for_posts([post["id"] for post in filtered_posts])
     schedules_by_post = get_schedules_for_posts([post["id"] for post in filtered_posts])
     post_rows = _aggregate_posts_for_library(filtered_posts, media_by_post, schedules_by_post)
+    post_rows = _decorate_post_rows_for_library(post_rows, media_by_post, schedules_by_post)
+    if filters["media_kind"]:
+        post_rows = [row for row in post_rows if row["library_kind"] == filters["media_kind"]]
     post_rows = _sort_post_rows(post_rows, filters["sort"])
     return render_template(
         "posts.html",
@@ -213,9 +226,73 @@ def posts():
         statuses=STATUSES,
         platforms=PLATFORMS,
         source_types=source_types,
+        media_kinds=media_kinds,
+        content_formats=PLATFORM_CONTENT_FORMATS,
         sort_options=sort_options,
         filters=filters,
     )
+
+
+@bp.post("/posts/library-update")
+def update_posts_library():
+    validate_csrf()
+    source_types = {"Regular", "News"}
+    action = request.form.get("action", "")
+
+    if action == "quick_source":
+        source_type = request.form.get("source_type", "")
+        if source_type not in source_types:
+            abort(400)
+        updated = update_library_post_fields([request.form.get("post_id", "")], source_type=source_type)
+        flash("Post type updated." if updated else "No post was updated.", "success" if updated else "warning")
+        return redirect(_posts_redirect_args())
+
+    if action == "bulk_update":
+        post_ids = request.form.getlist("selected_post_ids")
+        platform = request.form.get("platform", "")
+        source_type = request.form.get("source_type", "")
+        content_format = request.form.get("content_format", "")
+
+        if platform and platform not in PLATFORMS:
+            abort(400)
+        if source_type and source_type not in source_types:
+            abort(400)
+        target_platform = platform or ""
+        if content_format:
+            valid_formats = PLATFORM_CONTENT_FORMATS.get(target_platform, []) if target_platform else {
+                content_format
+                for formats in PLATFORM_CONTENT_FORMATS.values()
+                for content_format in formats
+            }
+            if content_format not in valid_formats:
+                abort(400)
+        if not post_ids:
+            flash("Select at least one regular post first.", "warning")
+            return redirect(_posts_redirect_args())
+        if not platform and not source_type and not content_format:
+            flash("Choose at least one bulk change.", "warning")
+            return redirect(_posts_redirect_args())
+
+        updated = update_library_post_fields(
+            post_ids,
+            platform=platform,
+            source_type=source_type,
+            content_format=content_format,
+        )
+        flash(f"Updated {updated} post(s)." if updated else "No regular posts were updated.", "success" if updated else "warning")
+        return redirect(_posts_redirect_args())
+
+    abort(400)
+
+
+def _posts_redirect_args():
+    allowed = {"search", "platform", "status", "source_type", "media_kind", "sort"}
+    args = {}
+    for key in allowed:
+        value = request.form.get(f"return_{key}", "")
+        if value:
+            args[key] = value
+    return url_for("main.posts", **args)
 
 
 def _aggregate_posts_for_library(posts, media_by_post, schedules_by_post):
@@ -274,6 +351,55 @@ def _aggregate_posts_for_library(posts, media_by_post, schedules_by_post):
         rows.append(group)
 
     return rows
+
+
+def _decorate_post_rows_for_library(rows, media_by_post, schedules_by_post):
+    for row in rows:
+        kind, label = _library_media_kind(row, media_by_post)
+        row["library_kind"] = kind
+        row["library_kind_label"] = label
+        schedule_label, schedule_extra = _library_schedule_summary(row, schedules_by_post)
+        row["schedule_label"] = schedule_label
+        row["schedule_extra"] = schedule_extra
+    return rows
+
+
+def _library_media_kind(row, media_by_post):
+    if row.get("is_rss_group"):
+        return "mixed", "Mix"
+
+    content_format = row.get("content_format", "")
+    media_items = media_by_post.get(row["id"], [])
+    media_types = {item["media_type"] for item in media_items}
+
+    if "Story" in content_format:
+        return "story", "Story"
+    if content_format in {"Reel", "Short"} or "Video" in content_format or "video" in media_types:
+        return "video", "Video"
+    if content_format in {"Image Post", "Carousel"} or "image" in media_types:
+        return "image", "Image"
+    return "text", "Text"
+
+
+def _library_schedule_summary(row, schedules_by_post):
+    if row.get("is_rss_group"):
+        if row.get("scheduled_at"):
+            extra = max(0, int(row.get("schedule_total") or 0) - 1)
+            return row["scheduled_at"], extra
+        return "Not scheduled", 0
+
+    values = []
+    if row.get("scheduled_at"):
+        values.append(row["scheduled_at"])
+    values.extend(
+        schedule["scheduled_at"]
+        for schedule in schedules_by_post.get(row["id"], [])
+        if schedule["scheduled_at"]
+    )
+    unique_values = sorted(set(values))
+    if not unique_values:
+        return "Not scheduled", 0
+    return unique_values[0], max(0, len(unique_values) - 1)
 
 
 def _x_manual_composer_url(post):

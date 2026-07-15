@@ -298,12 +298,16 @@ table {
 }
 
 .posts-table {
-    min-width: 1320px;
+    min-width: 1280px;
     table-layout: fixed;
 }
 
+.post-col-select {
+    width: 42px;
+}
+
 .post-col-title {
-    width: 34%;
+    width: 31%;
 }
 
 .post-col-platform {
@@ -311,7 +315,7 @@ table {
 }
 
 .post-col-format {
-    width: 9%;
+    width: 8.5%;
 }
 
 .post-col-status,
@@ -320,11 +324,7 @@ table {
     width: 7%;
 }
 
-.post-col-schedules {
-    width: 8%;
-}
-
-.post-col-scheduled,
+.post-col-schedule,
 .post-col-added,
 .post-col-hashtags {
     width: 9%;
@@ -425,6 +425,48 @@ tr:last-child td {
     color: var(--yellow);
 }
 
+.format-badge {
+    border-radius: 7px;
+    display: inline-flex;
+    font-size: 0.68rem;
+    font-weight: 950;
+    justify-content: center;
+    min-width: 42px;
+    padding: 5px 6px;
+    text-transform: uppercase;
+}
+
+.format-badge.story {
+    background: rgba(255, 79, 216, 0.14);
+    color: var(--accent);
+}
+
+.format-badge.video {
+    background: rgba(255, 117, 117, 0.14);
+    color: var(--red);
+}
+
+.format-badge.image {
+    background: rgba(244, 191, 95, 0.14);
+    color: var(--yellow);
+}
+
+.format-badge.text {
+    background: rgba(99, 230, 255, 0.12);
+    color: var(--cyan);
+}
+
+.format-badge.mixed {
+    background: rgba(148, 163, 184, 0.14);
+    color: #cbd5e1;
+}
+
+.format-caption {
+    font-size: 0.7rem;
+    line-height: 1.15;
+    margin-top: 6px;
+}
+
 .media-panel .media-pill {
     background: rgba(93, 240, 167, 0.14);
     color: var(--green);
@@ -444,6 +486,58 @@ tr:last-child td {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
+}
+
+.bulk-toolbar {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding: 12px;
+}
+
+.bulk-toolbar select {
+    max-width: 190px;
+    min-height: 38px;
+}
+
+.bulk-count {
+    color: var(--muted);
+    font-size: 0.82rem;
+    font-weight: 900;
+    min-width: 78px;
+}
+
+.inline-select-form {
+    margin: 0;
+}
+
+.compact-select {
+    border-radius: 999px;
+    font-size: 0.74rem;
+    font-weight: 900;
+    min-height: 30px;
+    min-width: 92px;
+    padding: 5px 8px;
+}
+
+.compact-select.regular {
+    border-color: rgba(99, 230, 255, 0.28);
+}
+
+.compact-select.news {
+    border-color: rgba(255, 117, 117, 0.28);
+}
+
+.schedule-value {
+    display: inline-block;
+    font-size: 0.82rem;
+    font-weight: 800;
+    margin-bottom: 6px;
 }
 
 .platform-list {
