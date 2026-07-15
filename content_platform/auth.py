@@ -8,6 +8,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 DEFAULT_ADMIN_PASSWORD = "change-me-local-admin"
 DEFAULT_ADMIN_USERNAME = "SquaredRedes"
 DEFAULT_EDITOR_USERNAME = "squaredp"
+DEFAULT_REVIEW_USERNAME = "meta-review"
 
 ADMIN_ONLY_ENDPOINTS = {
     "main.social_account_settings",
@@ -46,6 +47,20 @@ def verify_admin_credentials(username, password):
     return username == expected_username and verify_admin_password(password)
 
 
+def review_password_hash():
+    configured_hash = os.environ.get("REVIEW_PASSWORD_HASH")
+    if configured_hash:
+        return configured_hash
+    password = os.environ.get("REVIEW_PASSWORD")
+    return generate_password_hash(password) if password else ""
+
+
+def verify_review_credentials(username, password):
+    expected_username = os.environ.get("REVIEW_USERNAME", DEFAULT_REVIEW_USERNAME)
+    configured_hash = review_password_hash()
+    return bool(configured_hash) and username == expected_username and check_password_hash(configured_hash, password)
+
+
 def editor_password_hash():
     configured_hash = os.environ.get("EDITOR_PASSWORD_HASH")
     if configured_hash:
@@ -61,6 +76,8 @@ def verify_editor_password(password):
 
 def verify_user_credentials(username, password):
     if verify_admin_credentials(username, password):
+        return "admin"
+    if verify_review_credentials(username, password):
         return "admin"
 
     expected_username = os.environ.get("EDITOR_USERNAME", DEFAULT_EDITOR_USERNAME)

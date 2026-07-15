@@ -13,6 +13,10 @@ services:
         sync: false
       - key: ADMIN_USERNAME
         sync: false
+      - key: REVIEW_PASSWORD
+        sync: false
+      - key: REVIEW_USERNAME
+        sync: false
       - key: FLASK_DEBUG
         value: "0"
       - key: PYTHON_VERSION
