@@ -96,9 +96,16 @@ SECRET_KEY="long-random-secret"
 CREDENTIALS_ENCRYPTION_KEY="generated-fernet-key"
 ADMIN_USERNAME="SquaredRedes"
 ADMIN_PASSWORD="strong-password"
+EDITOR_USERNAME="squaredp"
+EDITOR_PASSWORD="different-strong-password"
 DATABASE_URL="postgresql://USER:PASSWORD@POOLER_HOST:6543/postgres?sslmode=require"
 APP_BASE_URL="https://your-render-service.onrender.com"
 ```
+
+`ADMIN_USERNAME` can manage everything, including RSS feeds and API Accounts.
+`EDITOR_USERNAME` can create, edit, schedule, and publish posts, but cannot open
+RSS feed management or API credential pages. Use a different password for each
+account.
 
 For public media uploads:
 
@@ -125,6 +132,17 @@ postgresql://USER:PASSWORD@POOLER_HOST:6543/postgres?sslmode=require
 ```
 
 Do not commit the real value to GitHub.
+
+Supabase may warn that public tables are accessible if Row-Level Security is not
+enabled. Because Supernova uses a server-side Flask connection instead of a
+browser Supabase client, direct `anon`/`authenticated` table access is not needed.
+Run this file in Supabase SQL Editor after the tables exist:
+
+```txt
+docs/supabase_rls.sql
+```
+
+This enables RLS on the app tables and revokes direct public role access.
 
 ## RSS Workflow
 

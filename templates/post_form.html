@@ -162,6 +162,14 @@
         <button class="button primary" type="submit">{{ action }} Post</button>
         {% if post %}
         <button class="button primary" type="submit" name="publish_after_save" value="1">Save and publish now</button>
+        <button
+            class="button danger"
+            type="submit"
+            formaction="{{ url_for('main.remove_post', post_id=post.id) }}"
+            formmethod="post"
+            formnovalidate
+            onclick="return confirm('Delete this post permanently? This cannot be undone.');"
+        >Delete post</button>
         {% endif %}
         <a class="button" href="{{ url_for('main.posts') }}">Cancel</a>
     </div>
@@ -287,6 +295,12 @@ function syncNewsRepeatHints() {
     const isNews = sourceTypeSelect.value === "News";
     repeatCountInput.placeholder = isNews ? "3" : "4";
     repeatIntervalInput.placeholder = isNews ? "2" : "14";
+    if (isNews && !repeatCountInput.value) {
+        repeatCountInput.value = "3";
+    }
+    if (isNews && !repeatIntervalInput.value) {
+        repeatIntervalInput.value = "2";
+    }
 }
 
 function contentBudget() {

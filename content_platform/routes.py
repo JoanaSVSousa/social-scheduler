@@ -22,7 +22,7 @@ from .models import (
     truncate_content_for_platform,
 )
 from .security import validate_csrf
-from .auth import is_logged_in, login_required, verify_admin_credentials
+from .auth import is_logged_in, login_required, verify_user_credentials
 from .services.analytics import build_platform_counts, build_status_counts
 from .services.media import delete_media, get_media_for_post, get_media_for_posts, save_media_files
 from .services.publisher import process_publication_queue, publish_post_now, publish_rss_group_now
@@ -517,8 +517,14 @@ def edit_rss_article(rss_item_id):
         if not general_values["title"] or not general_values["content"]:
             abort(400)
         general_schedule_dates = _schedule_dates_from_general_form(content_type)
+        general_values["scheduled_at"], general_values["status"] = _scheduled_values(
+            general_values["status"],
+            general_values["scheduled_at"],
+            general_schedule_dates,
+        )
         general_media_files = request.files.getlist("general_media_files")
         updates = []
+        schedule_dates_by_post = {}
         for post in posts:
             prefix = f"post_{post['id']}_"
             status = _override_or_general(prefix, "status", post["status"], general_values["status"])
@@ -536,6 +542,14 @@ def edit_rss_article(rss_item_id):
             hashtags = _override_or_general(prefix, "hashtags", post["hashtags"], general_values["hashtags"], 400)
             content = _override_or_general(prefix, "content", post["content"], general_values["content"])
             content = truncate_content_for_platform(post["platform"], content, hashtags)
+            schedule_dates = (
+                _schedule_dates_from_prefixed_form(prefix, content_type)
+                if _uses_field_override(prefix, "schedule")
+                else general_schedule_dates
+            )
+            schedule_dates_by_post[post["id"]] = schedule_dates
+            scheduled_at = _datetime_from_form(prefix) if _uses_field_override(prefix, "schedule") else general_values["scheduled_at"]
+            scheduled_at, status = _scheduled_values(status, scheduled_at, schedule_dates)
             updates.append(
                 {
                     "post_id": post["id"],
@@ -544,7 +558,7 @@ def edit_rss_article(rss_item_id):
                     "hashtags": hashtags,
                     "content_format": content_format,
                     "status": status,
-                    "scheduled_at": _datetime_from_form(prefix) if _uses_field_override(prefix, "schedule") else general_values["scheduled_at"],
+                    "scheduled_at": scheduled_at,
                 }
             )
             if not updates[-1]["title"] or not updates[-1]["content"]:
@@ -559,12 +573,7 @@ def edit_rss_article(rss_item_id):
                 if _uses_field_override(prefix, "format")
                 else general_content_format
             )
-            schedule_dates = (
-                _schedule_dates_from_prefixed_form(prefix, content_type)
-                if _uses_field_override(prefix, "schedule")
-                else general_schedule_dates
-            )
-            replace_schedules(post["id"], schedule_dates)
+            replace_schedules(post["id"], schedule_dates_by_post.get(post["id"], []))
             _reset_file_streams(general_media_files)
             saved, skipped = save_media_files(post["id"], general_media_files, content_format)
             _flash_media_result(saved, skipped)
@@ -616,8 +625,10 @@ def new_post():
     if request.method == "POST":
         validate_csrf()
         post_data = _post_from_form()
+        schedule_dates = _schedule_dates_from_form(post_data.source_type)
+        _apply_schedule_status(post_data, schedule_dates)
         post_id = create_post(post_data)
-        replace_schedules(post_id, _schedule_dates_from_form(post_data.source_type))
+        replace_schedules(post_id, schedule_dates)
         saved, skipped = save_media_files(post_id, request.files.getlist("media_files"), request.form.get("content_format", ""))
         _flash_media_result(saved, skipped)
         flash("Post created. You can keep editing or publish it when ready.", "success")
@@ -649,8 +660,10 @@ def edit_post(post_id):
     if request.method == "POST":
         validate_csrf()
         post_data = _post_from_form()
+        schedule_dates = _schedule_dates_from_form(post_data.source_type)
+        _apply_schedule_status(post_data, schedule_dates)
         update_post(post_id, post_data)
-        replace_schedules(post_id, _schedule_dates_from_form(post_data.source_type))
+        replace_schedules(post_id, schedule_dates)
         saved, skipped = save_media_files(post_id, request.files.getlist("media_files"), request.form.get("content_format", ""))
         _flash_media_result(saved, skipped)
         if request.form.get("publish_after_save") == "1":
@@ -1327,12 +1340,14 @@ def logs():
 def login():
     if request.method == "POST":
         validate_csrf()
-        if verify_admin_credentials(request.form.get("username", ""), request.form.get("password", "")):
+        role = verify_user_credentials(request.form.get("username", ""), request.form.get("password", ""))
+        if role:
             from flask import session
 
             session["admin_authenticated"] = True
+            session["user_role"] = role
             return redirect(_safe_next_url() or url_for("main.dashboard"))
-        flash("Invalid password.", "warning")
+        flash("Invalid username or password.", "warning")
 
     return render_template("login.html")
 
@@ -1343,6 +1358,7 @@ def logout():
     from flask import session
 
     session.pop("admin_authenticated", None)
+    session.pop("user_role", None)
     return redirect(url_for("main.dashboard"))
 
 
@@ -1456,6 +1472,19 @@ def remove_rss_feed(feed_id):
     return redirect(url_for("main.rss_feeds"))
 
 
+def _scheduled_values(status, scheduled_at, schedule_dates):
+    schedule_dates = schedule_dates or []
+    if not scheduled_at and schedule_dates:
+        scheduled_at = schedule_dates[0]
+    if (scheduled_at or schedule_dates) and status in {"Draft", "Scheduled"}:
+        status = "Scheduled"
+    return scheduled_at, status
+
+
+def _apply_schedule_status(post, schedule_dates):
+    post.scheduled_at, post.status = _scheduled_values(post.status, post.scheduled_at, schedule_dates)
+
+
 def _post_from_form():
     title = request.form["title"].strip()
     content = request.form["content"].strip()
@@ -1481,7 +1510,12 @@ def _post_from_form():
         abort(400)
     if len(hashtags) > 400:
         abort(400)
-    if status == "Scheduled" and not scheduled_at and not request.form.get("schedule_dates", "").strip():
+    if (
+        status == "Scheduled"
+        and not scheduled_at
+        and not request.form.get("schedule_dates", "").strip()
+        and not request.form.get("repeat_date", "").strip()
+    ):
         abort(400)
 
     return Post(

@@ -2,9 +2,9 @@ from pathlib import Path
 import os
 from secrets import token_urlsafe
 
-from flask import Flask, jsonify, redirect, request, url_for
+from flask import Flask, abort, jsonify, redirect, request, url_for
 
-from .auth import is_logged_in, should_require_login
+from .auth import is_admin, is_logged_in, should_require_admin, should_require_login
 from .database import DEFAULT_DB_PATH, init_db
 from .routes import bp
 from .security import add_security_headers, csrf_token
@@ -26,13 +26,15 @@ def create_app():
     app.config["SESSION_COOKIE_SECURE"] = os.environ.get("SESSION_COOKIE_SECURE", "1") == "1"
 
     init_db(app.config["DATABASE"])
-    app.context_processor(lambda: {"csrf_token": csrf_token})
+    app.context_processor(lambda: {"csrf_token": csrf_token, "can_manage_integrations": is_admin()})
     app.after_request(add_security_headers)
 
     @app.before_request
     def require_app_login():
         if should_require_login(request.endpoint) and not is_logged_in():
             return redirect(url_for("main.login", next=request.path))
+        if should_require_admin(request.endpoint) and not is_admin():
+            abort(403)
 
     @app.get("/healthz")
     def healthz():
