@@ -960,6 +960,7 @@ def extend_facebook_page_token():
 
 
 @bp.post("/settings/social-accounts/Threads/connect")
+@bp.post("/settings/social-accounts/threads/connect")
 @login_required
 def connect_threads_account():
     validate_csrf()
@@ -987,6 +988,7 @@ def connect_threads_account():
 
 
 @bp.get("/settings/social-accounts/Threads/callback")
+@bp.get("/settings/social-accounts/threads/callback")
 @login_required
 def threads_oauth_callback():
     if request.args.get("state") != session.pop("threads_oauth_state", ""):
@@ -1009,6 +1011,9 @@ def threads_oauth_callback():
     redirect_uri = _external_oauth_url("main.threads_oauth_callback")
     try:
         token_payload = _exchange_threads_authorization_code(app_id, app_secret, code, redirect_uri)
+        access_token = token_payload.get("access_token")
+        if access_token:
+            token_payload.update(_exchange_threads_long_lived_token(app_secret, access_token))
     except RuntimeError as exc:
         flash(str(exc), "warning")
         return redirect(url_for("main.social_account_settings"))
@@ -1019,15 +1024,19 @@ def threads_oauth_callback():
         flash("Threads authorization did not return both access_token and user_id.", "warning")
         return redirect(url_for("main.social_account_settings"))
 
-    save_social_account(
+    update_social_account_credentials(
         "Threads",
-        account.get("account_label", ""),
-        account.get("account_handle", ""),
-        account.get("auth_type", "threads_api") or "threads_api",
-        {"threads_user_id": user_id, "access_token": access_token},
+        {
+            "threads_user_id": user_id,
+            "access_token": access_token,
+            "token_expires_at": _token_expires_at_from_seconds(token_payload.get("expires_in")),
+            "token_expires_label": _format_relative_expiry(token_payload.get("expires_in")),
+            "token_source": "Threads OAuth long-lived token",
+        },
+        connection_status=STATUS_CONNECTED,
     )
     add_log(None, "INFO", "Threads OAuth connected and credentials updated.")
-    flash("Threads connected. User ID and access token saved.", "success")
+    flash("Threads connected. Long-lived user token saved.", "success")
     return redirect(url_for("main.social_account_settings"))
 
 
@@ -1055,6 +1064,18 @@ def _exchange_threads_authorization_code(app_id, app_secret, code, redirect_uri)
         raise RuntimeError(f"Threads token exchange failed {exc.code}: {detail[:400]}") from exc
     except (URLError, TimeoutError, ValueError, json.JSONDecodeError) as exc:
         raise RuntimeError(f"Threads token exchange failed: {exc}") from exc
+
+
+def _exchange_threads_long_lived_token(app_secret, short_lived_access_token):
+    return _threads_get_json(
+        "https://graph.threads.net/access_token",
+        {
+            "grant_type": "th_exchange_token",
+            "client_secret": app_secret,
+            "access_token": short_lived_access_token,
+        },
+        "Threads long-lived token exchange",
+    )
 
 
 def _exchange_facebook_authorization_code(app_id, app_secret, code, redirect_uri):
@@ -1172,10 +1193,11 @@ def _verify_threads_account(credentials):
     access_token = credentials.get("access_token", "")
     if not threads_user_id or not access_token:
         raise RuntimeError("Threads needs Threads User ID and User Access Token.")
+    _guard_threads_token_shape(access_token)
 
-    account = _meta_get_json(
-        f"https://graph.threads.net/v1.0/{threads_user_id}",
-        {"fields": "id,username,name", "access_token": access_token},
+    account = _threads_get_json(
+        "https://graph.threads.net/v1.0/me",
+        {"fields": "id,username", "access_token": access_token},
         "Threads account lookup",
     )
     if str(account.get("id", "")) != str(threads_user_id):
@@ -1183,7 +1205,38 @@ def _verify_threads_account(credentials):
             "The Threads token is readable, but it belongs to Threads ID "
             f"{account.get('id')}, not the configured ID {threads_user_id}."
         )
-    return f"Threads account {account.get('username') or account.get('name') or account.get('id')} is readable."
+    return f"Threads account {account.get('username') or account.get('id')} is readable."
+
+
+def _guard_threads_token_shape(access_token):
+    if access_token.strip().startswith("EAA"):
+        raise RuntimeError(
+            "The saved token looks like a Facebook/Meta Graph token, not a Threads token. "
+            "Remove the Threads credentials, save the Threads App ID/App Secret again, then use Connect Threads."
+        )
+
+
+def _threads_get_json(url, params, endpoint_name):
+    request_url = f"{url}?{urlencode(params)}"
+    try:
+        with urlopen(Request(request_url, method="GET"), timeout=META_GRAPH_TIMEOUT_SECONDS) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"{endpoint_name} error {exc.code}: {_clean_threads_error(detail)}") from exc
+    except (URLError, TimeoutError, ValueError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"{endpoint_name} failed or timed out while contacting Threads: {exc}") from exc
+
+
+def _clean_threads_error(detail):
+    cleaned = _clean_meta_error(detail)
+    if "Cannot parse access token" in cleaned:
+        return (
+            "Invalid OAuth access token - Cannot parse access token. "
+            "This usually means the saved token is not a Threads OAuth token. "
+            "Use Connect Threads to generate a Threads token; do not paste a Facebook/Graph Explorer EAA token."
+        )
+    return cleaned
 
 
 def _external_oauth_url(endpoint):
@@ -1291,6 +1344,27 @@ def _format_meta_expiry(expires_at):
         return "Meta reports no fixed expiry for this Page token."
     expires = datetime.fromtimestamp(expires_at, tz=timezone.utc)
     return f"Expires at {expires.strftime('%Y-%m-%d %H:%M UTC')}."
+
+
+def _token_expires_at_from_seconds(expires_in):
+    try:
+        seconds = int(expires_in or 0)
+    except (TypeError, ValueError):
+        return ""
+    if seconds <= 0:
+        return ""
+    return str(int(datetime.now(tz=timezone.utc).timestamp()) + seconds)
+
+
+def _format_relative_expiry(expires_in):
+    try:
+        seconds = int(expires_in or 0)
+    except (TypeError, ValueError):
+        return ""
+    if seconds <= 0:
+        return ""
+    expires_at = int(datetime.now(tz=timezone.utc).timestamp()) + seconds
+    return _format_meta_expiry(expires_at)
 
 
 def _meta_get_json(url, params, endpoint_name):

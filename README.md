@@ -40,7 +40,7 @@ The goal is not just to store posts. The goal is to model a real automation work
 - MP4 video upload validation for API publishing
 - Real API publishing for Bluesky, Facebook feed/photo/video posts, and Instagram Graph feed media through the linked Facebook Page token
 - Credential storage encrypted at rest
-- API account verification for Facebook and Instagram through Meta Graph
+- API account verification for Facebook, Instagram, and Threads
 - Long-lived Meta Page token helpers for Facebook; Instagram reuses the same Page token
 
 ## Platform Status
@@ -50,7 +50,7 @@ The goal is not just to store posts. The goal is to model a real automation work
 | Bluesky | Real publishing implemented for text, links, hashtags, and image embeds. |
 | Facebook | Real Page publishing implemented for feed posts, link posts, photos, and videos. Stories/Reels are protected until dedicated endpoints are implemented. |
 | Instagram | Publishing implemented through the linked Facebook Page token for Graph API media containers. Feed media is the primary supported path; Reels/Stories remain endpoint-specific testing work. |
-| Threads | Credential storage and publishing flow scaffolded. Needs correct user token flow and final testing. |
+| Threads | OAuth connection, long-lived token exchange, credential verification, and publishing flow implemented. Needs final live publish validation with a real Threads token. |
 | X | Kept in roadmap/manual flow because free general API access is deprecated. |
 | LinkedIn | Credential storage and text/link publishing scaffolded. |
 | TikTok | Credential storage scaffolded; upload flow is roadmap. |
@@ -308,6 +308,26 @@ Fallback workflow for Meta Page tokens:
 
 Instagram then uses the saved Facebook Page token. Tokens can still be invalidated by Meta if permissions change, the app is removed, the password is reset, or Meta security policy requires reauthorization.
 
+## Threads Token Workflow
+
+Threads does not use the Facebook Page token and it does not accept Facebook/Graph Explorer tokens that start with `EAA`.
+
+Threads recommended workflow:
+
+1. Save the Threads App ID and Threads App Secret in the Threads card.
+2. Add the Threads OAuth callback shown in the Threads card to the Threads API callback settings.
+3. Click `Connect Threads`.
+4. Log in with the Threads account that should publish content.
+5. Click `Verify credentials`.
+
+Production Threads callback URL:
+
+```txt
+https://social-scheduler-u1we.onrender.com/settings/social-accounts/threads/callback
+```
+
+The app receives the OAuth code, exchanges it for a Threads user token, upgrades it to a long-lived Threads token, saves the Threads User ID, and records token expiry metadata. If verification says `Cannot parse access token`, the saved token is not a Threads OAuth token; remove the Threads credentials, save the App ID/App Secret again, and reconnect.
+
 ## Email Dashboard Report
 
 Send a dashboard-style email report:
@@ -377,7 +397,7 @@ This project demonstrates:
 ## Roadmap
 
 - Finish dedicated Instagram Reels/Stories validation and format-specific guardrails
-- Finish Threads OAuth/user-token flow
+- Live-test Threads publishing after OAuth connection is accepted
 - Add verification buttons for every API account
 - Add retry/backoff queue for scheduled publishing
 - Add analytics for best day/hour/platform
