@@ -95,7 +95,17 @@ def login_required(view):
 
 
 def should_require_login(endpoint):
-    if endpoint in {None, "healthz", "main.login", "static"}:
+    if endpoint in {
+        None,
+        "healthz",
+        "main.login",
+        "main.privacy_policy",
+        "main.terms_of_service",
+        "main.meta_deauthorize",
+        "main.meta_data_deletion",
+        "main.data_deletion_status",
+        "static",
+    }:
         return False
     return True
 

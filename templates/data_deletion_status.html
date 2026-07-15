@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="section-title">
+    <div>
+        <p class="eyebrow">Data deletion</p>
+        <h1>Request Received</h1>
+    </div>
+</section>
+
+<section class="panel prose-panel">
+    <p>Your data deletion request has been received.</p>
+    <p>Confirmation code: <strong>{{ confirmation_code }}</strong></p>
+    <p>If the connected account exists in Supernova, stored credentials for that platform can be removed from the API Accounts page by an authorized administrator.</p>
+</section>
+{% endblock %}

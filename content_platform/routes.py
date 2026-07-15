@@ -1,6 +1,7 @@
 from calendar import Calendar, month_name
 from datetime import datetime, timedelta, timezone
 import json
+import os
 import secrets
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlparse
@@ -99,6 +100,37 @@ INSTAGRAM_REQUIRED_SCOPES = [
     "instagram_basic",
     "instagram_content_publish",
 ]
+
+
+@bp.get("/privacy")
+def privacy_policy():
+    return render_template("privacy.html")
+
+
+@bp.get("/terms")
+def terms_of_service():
+    return render_template("terms.html")
+
+
+@bp.route("/meta/deauthorize", methods=["GET", "POST"])
+def meta_deauthorize():
+    return jsonify({"ok": True, "message": "App deauthorization received."})
+
+
+@bp.route("/meta/data-deletion", methods=["GET", "POST"])
+def meta_data_deletion():
+    confirmation_code = secrets.token_urlsafe(12)
+    return jsonify(
+        {
+            "url": _external_oauth_url("main.data_deletion_status", code=confirmation_code),
+            "confirmation_code": confirmation_code,
+        }
+    )
+
+
+@bp.get("/meta/data-deletion/status/<code>")
+def data_deletion_status(code):
+    return render_template("data_deletion_status.html", confirmation_code=code)
 
 
 @bp.route("/")
@@ -976,7 +1008,7 @@ def connect_threads_account():
     state = secrets.token_urlsafe(24)
     session["threads_oauth_state"] = state
     redirect_uri = _external_oauth_url("main.threads_oauth_callback")
-    authorization_url = "https://threads.net/oauth/authorize?" + urlencode(
+    authorization_url = "https://www.threads.com/oauth/authorize?" + urlencode(
         {
             "client_id": app_id,
             "redirect_uri": redirect_uri,
@@ -1240,12 +1272,15 @@ def _clean_threads_error(detail):
     return cleaned
 
 
-def _external_oauth_url(endpoint):
-    # Render terminates HTTPS before Flask sees the request. For OAuth, the
-    # redirect_uri must match Meta's allowlist exactly, including the scheme.
+def _external_oauth_url(endpoint, **values):
+    # Render terminates HTTPS before Flask sees the request. For OAuth and Meta
+    # callbacks, prefer the configured production base URL when available.
+    app_base_url = os.environ.get("APP_BASE_URL", "").rstrip("/")
+    if app_base_url:
+        return app_base_url + url_for(endpoint, **values)
     if request.host.endswith("onrender.com"):
-        return url_for(endpoint, _external=True, _scheme="https")
-    return url_for(endpoint, _external=True)
+        return url_for(endpoint, _external=True, _scheme="https", **values)
+    return url_for(endpoint, _external=True, **values)
 
 
 def _generate_long_lived_facebook_page_token(page_id, app_id, app_secret, short_lived_user_token):
