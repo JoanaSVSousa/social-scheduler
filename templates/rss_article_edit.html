@@ -95,7 +95,9 @@
                     Status
                     <select data-general-field="status" name="general_status">
                         {% for status in statuses %}
+                        {% if status != "Published" or general_defaults.status == "Published" %}
                         <option value="{{ status }}" {% if general_defaults.status == status %}selected{% endif %}>{{ status }}</option>
+                        {% endif %}
                         {% endfor %}
                     </select>
                 </label>
@@ -280,7 +282,9 @@
                 <input type="hidden" name="{{ prefix }}override_status" value="{% if overrides.status %}1{% else %}0{% endif %}" data-override-flag="status">
                 <select data-preview-status data-network-field="status" name="{{ prefix }}status">
                     {% for status in statuses %}
+                    {% if status != "Published" or post.status == "Published" %}
                     <option value="{{ status }}" {% if post.status == status %}selected{% endif %}>{{ status }}</option>
+                    {% endif %}
                     {% endfor %}
                 </select>
             </label>

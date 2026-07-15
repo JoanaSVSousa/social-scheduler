@@ -77,6 +77,19 @@ def mark_schedule_status(schedule_id, status):
         )
 
 
+def has_pending_schedules(post_id):
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT 1 FROM post_schedules
+            WHERE post_id = ? AND status = 'Scheduled'
+            LIMIT 1
+            """,
+            (post_id,),
+        ).fetchone()
+    return row is not None
+
+
 def get_schedule(schedule_id):
     with get_connection() as conn:
         return conn.execute("SELECT * FROM post_schedules WHERE id = ?", (schedule_id,)).fetchone()

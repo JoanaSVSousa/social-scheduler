@@ -521,6 +521,7 @@ def edit_rss_article(rss_item_id):
             general_values["status"],
             general_values["scheduled_at"],
             general_schedule_dates,
+            current_status=posts[0]["status"] if posts else "",
         )
         general_media_files = request.files.getlist("general_media_files")
         updates = []
@@ -549,7 +550,7 @@ def edit_rss_article(rss_item_id):
             )
             schedule_dates_by_post[post["id"]] = schedule_dates
             scheduled_at = _datetime_from_form(prefix) if _uses_field_override(prefix, "schedule") else general_values["scheduled_at"]
-            scheduled_at, status = _scheduled_values(status, scheduled_at, schedule_dates)
+            scheduled_at, status = _scheduled_values(status, scheduled_at, schedule_dates, current_status=post["status"])
             updates.append(
                 {
                     "post_id": post["id"],
@@ -661,7 +662,7 @@ def edit_post(post_id):
         validate_csrf()
         post_data = _post_from_form()
         schedule_dates = _schedule_dates_from_form(post_data.source_type)
-        _apply_schedule_status(post_data, schedule_dates)
+        _apply_schedule_status(post_data, schedule_dates, current_status=post["status"])
         update_post(post_id, post_data)
         replace_schedules(post_id, schedule_dates)
         saved, skipped = save_media_files(post_id, request.files.getlist("media_files"), request.form.get("content_format", ""))
@@ -1546,17 +1547,24 @@ def remove_rss_feed(feed_id):
     return redirect(url_for("main.rss_feeds"))
 
 
-def _scheduled_values(status, scheduled_at, schedule_dates):
+def _scheduled_values(status, scheduled_at, schedule_dates, current_status=""):
     schedule_dates = schedule_dates or []
     if not scheduled_at and schedule_dates:
         scheduled_at = schedule_dates[0]
-    if (scheduled_at or schedule_dates) and status in {"Draft", "Scheduled"}:
+    if scheduled_at or schedule_dates:
         status = "Scheduled"
+    elif status == "Published" and current_status != "Published":
+        status = "Draft"
     return scheduled_at, status
 
 
-def _apply_schedule_status(post, schedule_dates):
-    post.scheduled_at, post.status = _scheduled_values(post.status, post.scheduled_at, schedule_dates)
+def _apply_schedule_status(post, schedule_dates, current_status=""):
+    post.scheduled_at, post.status = _scheduled_values(
+        post.status,
+        post.scheduled_at,
+        schedule_dates,
+        current_status=current_status,
+    )
 
 
 def _post_from_form():

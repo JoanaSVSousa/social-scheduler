@@ -5,7 +5,7 @@ from .media import get_media_for_post
 from .media_optimizer import prepare_media_for_publish
 from .platform_publishers import is_platform_publishable, publish_to_platform
 from .scheduler import add_log, get_due_posts, get_post, mark_post_status
-from .schedules import get_due_schedules, mark_schedule_status
+from .schedules import get_due_schedules, has_pending_schedules, mark_schedule_status
 from .clock import app_minutes_ago_string
 
 
@@ -16,12 +16,20 @@ def process_publication_queue():
     published = 0
 
     for schedule in due_schedules:
-        result = publish_post_by_id(schedule["post_id"], f"Scheduled recycled publish due at {schedule['scheduled_at']}.")
+        result = publish_post_by_id(
+            schedule["post_id"],
+            f"Scheduled recycled publish due at {schedule['scheduled_at']}.",
+            mark_post_published=False,
+        )
         if result["ok"]:
             mark_schedule_status(schedule["id"], "Published")
+            if not has_pending_schedules(schedule["post_id"]):
+                mark_post_status(schedule["post_id"], "Published")
             published += 1
         elif not result.get("skipped"):
             mark_schedule_status(schedule["id"], "Failed")
+            if not has_pending_schedules(schedule["post_id"]):
+                mark_post_status(schedule["post_id"], "Failed")
 
     for post in due_posts:
         result = publish_post(post, "Scheduled publish due now.")
@@ -51,22 +59,23 @@ def publish_post_now(post_id):
     return publish_post_by_id(post_id, "Manual publish requested from Posts page.")
 
 
-def publish_post_by_id(post_id, reason):
+def publish_post_by_id(post_id, reason, mark_post_published=True):
     post = get_post(post_id)
     if post is None:
         return {"ok": False, "message": "Post not found."}
-    return publish_post(post, reason)
+    return publish_post(post, reason, mark_post_published=mark_post_published)
 
 
-def publish_post(post, reason):
+def publish_post(post, reason, mark_post_published=True):
     if not is_platform_publishable(post["platform"]):
         message = f"Real API publishing is not implemented yet for {post['platform']}."
         add_log(post["id"], "INFO", f"{reason} Skipped. {message}")
         return {"ok": False, "skipped": True, "message": message, "post_id": post["id"]}
     try:
-        uri = _publish_post(post, reason)
+        uri = _publish_post(post, reason, mark_post_published=mark_post_published)
     except Exception as exc:
-        mark_post_status(post["id"], "Failed")
+        if mark_post_published:
+            mark_post_status(post["id"], "Failed")
         add_log(post["id"], "ERROR", f"{reason} Publication failed: {exc}")
         return {"ok": False, "message": str(exc), "post_id": post["id"]}
     return {"ok": True, "message": uri, "post_id": post["id"]}
@@ -93,11 +102,12 @@ def publish_rss_group_now(posts):
     return {"published": published, "failed": failed, "skipped": skipped, "messages": messages}
 
 
-def _publish_post(post, reason):
+def _publish_post(post, reason, mark_post_published=True):
     media_items = prepare_media_for_publish(get_media_for_post(post["id"]))
     _validate_media_requirements(post, media_items)
     uri = publish_to_platform(post, media_items)
-    mark_post_status(post["id"], "Published")
+    if mark_post_published:
+        mark_post_status(post["id"], "Published")
     add_log(
         post["id"],
         "SUCCESS",

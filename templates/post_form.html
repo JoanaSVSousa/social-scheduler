@@ -50,7 +50,9 @@
             Status
             <select name="status" id="status-select" required>
                 {% for status in statuses %}
+                {% if status != "Published" or (post and post.status == "Published") %}
                 <option value="{{ status }}" {% if post and post.status == status %}selected{% endif %}>{{ status }}</option>
+                {% endif %}
                 {% endfor %}
             </select>
         </label>
