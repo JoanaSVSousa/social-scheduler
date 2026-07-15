@@ -44,6 +44,7 @@ from .services.rss_groups import (
     move_rss_group_schedule_occurrence,
     sync_rss_group_platforms,
     update_rss_group_content_type,
+    update_rss_group_library_fields,
     update_rss_group_posts,
 )
 from .services.schedules import (
@@ -248,7 +249,9 @@ def update_posts_library():
         return redirect(_posts_redirect_args())
 
     if action == "bulk_update":
-        post_ids = request.form.getlist("selected_post_ids")
+        selected_ids = request.form.getlist("selected_post_ids")
+        post_ids = [item for item in selected_ids if item.isdigit()]
+        rss_item_ids = [item.removeprefix("rss:") for item in selected_ids if item.startswith("rss:")]
         platform = request.form.get("platform", "")
         source_type = request.form.get("source_type", "")
         content_format = request.form.get("content_format", "")
@@ -266,8 +269,8 @@ def update_posts_library():
             }
             if content_format not in valid_formats:
                 abort(400)
-        if not post_ids:
-            flash("Select at least one regular post first.", "warning")
+        if not selected_ids:
+            flash("Select at least one post first.", "warning")
             return redirect(_posts_redirect_args())
         if not platform and not source_type and not content_format:
             flash("Choose at least one bulk change.", "warning")
@@ -279,7 +282,15 @@ def update_posts_library():
             source_type=source_type,
             content_format=content_format,
         )
-        flash(f"Updated {updated} post(s)." if updated else "No regular posts were updated.", "success" if updated else "warning")
+        updated += update_rss_group_library_fields(
+            rss_item_ids,
+            source_type=source_type,
+            content_format=content_format,
+        )
+        message = f"Updated {updated} item(s)."
+        if platform and rss_item_ids:
+            message += " Mix groups kept their existing platforms."
+        flash(message if updated else "No items were updated.", "success" if updated else "warning")
         return redirect(_posts_redirect_args())
 
     abort(400)
@@ -361,6 +372,7 @@ def _decorate_post_rows_for_library(rows, media_by_post, schedules_by_post):
         schedule_label, schedule_extra = _library_schedule_summary(row, schedules_by_post)
         row["schedule_label"] = schedule_label
         row["schedule_extra"] = schedule_extra
+        row["created_at_label"] = _format_datetime_display(row.get("created_at", ""))
     return rows
 
 
@@ -385,7 +397,7 @@ def _library_schedule_summary(row, schedules_by_post):
     if row.get("is_rss_group"):
         if row.get("scheduled_at"):
             extra = max(0, int(row.get("schedule_total") or 0) - 1)
-            return row["scheduled_at"], extra
+            return _format_datetime_display(row["scheduled_at"]), extra
         return "Not scheduled", 0
 
     values = []
@@ -399,7 +411,24 @@ def _library_schedule_summary(row, schedules_by_post):
     unique_values = sorted(set(values))
     if not unique_values:
         return "Not scheduled", 0
-    return unique_values[0], max(0, len(unique_values) - 1)
+    return _format_datetime_display(unique_values[0]), max(0, len(unique_values) - 1)
+
+
+def _format_datetime_display(value):
+    if not value:
+        return ""
+    normalized = str(value).strip().replace(" ", "T", 1)
+    if "." in normalized:
+        normalized = normalized.split(".", 1)[0]
+    if normalized.endswith("+00"):
+        normalized = normalized[:-3]
+    if "+" in normalized:
+        normalized = normalized.split("+", 1)[0]
+    try:
+        parsed = datetime.fromisoformat(normalized[:16])
+    except ValueError:
+        return str(value)
+    return parsed.strftime("%d/%m/%Y %H:%M")
 
 
 def _x_manual_composer_url(post):
@@ -1758,6 +1787,7 @@ def _post_from_form():
         and not scheduled_at
         and not request.form.get("schedule_dates", "").strip()
         and not request.form.get("repeat_date", "").strip()
+        and not request.form.get("repeat_count", "").strip()
     ):
         abort(400)
 
@@ -1885,7 +1915,7 @@ def _unique_schedule_dates(dates):
 
 
 def _recurring_dates_from_form(prefix, source_type="Regular", fallback_start=""):
-    start = _datetime_from_form(prefix, "repeat") or (fallback_start if source_type == "News" else "")
+    start = _datetime_from_form(prefix, "repeat") or fallback_start
     count = request.form.get(prefix + "repeat_count", "").strip()
     interval_days = request.form.get(prefix + "repeat_interval_days", "").strip()
     if source_type == "News" and start:

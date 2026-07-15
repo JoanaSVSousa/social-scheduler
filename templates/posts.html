@@ -54,19 +54,19 @@
     <input type="hidden" name="return_sort" value="{{ filters.sort }}">
     <span class="bulk-count" data-selected-count>0 selected</span>
     <select name="platform" data-bulk-platform>
-        <option value="">Keep platform</option>
+        <option value="">Change platform...</option>
         {% for platform in platforms %}
         <option value="{{ platform }}">{{ platform }}</option>
         {% endfor %}
     </select>
     <select name="source_type">
-        <option value="">Keep type</option>
+        <option value="">Change type...</option>
         {% for source_type in source_types %}
         <option value="{{ source_type }}">{{ source_type }}</option>
         {% endfor %}
     </select>
     <select name="content_format" data-bulk-format>
-        <option value="">Keep format</option>
+        <option value="">Change format...</option>
         {% for platform, formats in content_formats.items() %}
             {% for format in formats %}
             <option value="{{ format }}" data-platform="{{ platform }}">{{ platform }} · {{ format }}</option>
@@ -110,9 +110,7 @@
             {% for post in posts %}
             <tr>
                 <td>
-                    {% if not post.is_rss_group %}
-                    <input type="checkbox" name="selected_post_ids" value="{{ post.id }}" form="bulk-posts-form" data-row-select aria-label="Select {{ post.title }}">
-                    {% endif %}
+                    <input type="checkbox" name="selected_post_ids" value="{% if post.is_rss_group %}rss:{{ post.rss_item_id }}{% else %}{{ post.id }}{% endif %}" form="bulk-posts-form" data-row-select aria-label="Select {{ post.title }}">
                 </td>
                 <td>
                     <span class="format-badge {{ post.library_kind }}">{{ post.library_kind_label }}</span>
@@ -176,7 +174,7 @@
                     <span class="media-pill">+{{ post.schedule_extra }}</span>
                     {% endif %}
                 </td>
-                <td>{{ post.created_at }}</td>
+                <td>{{ post.created_at_label }}</td>
                 <td>{{ post.hashtags }}</td>
                 <td class="actions">
                     {% if post.is_rss_group %}

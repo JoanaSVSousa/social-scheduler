@@ -1,5 +1,5 @@
 from ..database import get_connection, insert_and_get_id
-from ..models import default_content_format
+from ..models import PLATFORM_CONTENT_FORMATS, default_content_format
 from .media import delete_media
 
 
@@ -160,6 +160,58 @@ def update_rss_group_content_type(rss_item_id, content_type):
             "INSERT INTO logs (post_id, level, message) VALUES (?, ?, ?)",
             (None, "INFO", f"RSS article group #{rss_item_id} marked as {content_type}."),
         )
+
+
+def update_rss_group_library_fields(rss_item_ids, source_type="", content_format=""):
+    rss_item_ids = [int(item_id) for item_id in rss_item_ids if str(item_id).isdigit()]
+    if not rss_item_ids:
+        return 0
+
+    updated = 0
+    with get_connection() as conn:
+        for rss_item_id in rss_item_ids:
+            if source_type:
+                conn.execute(
+                    "UPDATE rss_items SET content_type = ? WHERE id = ?",
+                    (source_type, rss_item_id),
+                )
+                conn.execute(
+                    """
+                    UPDATE posts
+                    SET source_type = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE rss_item_id = ?
+                    """,
+                    (source_type, rss_item_id),
+                )
+                updated += 1
+
+            if content_format:
+                posts = conn.execute(
+                    "SELECT id, platform FROM posts WHERE rss_item_id = ?",
+                    (rss_item_id,),
+                ).fetchall()
+                changed_any = False
+                for post in posts:
+                    if content_format not in PLATFORM_CONTENT_FORMATS.get(post["platform"], []):
+                        continue
+                    conn.execute(
+                        """
+                        UPDATE posts
+                        SET content_format = ?, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                        """,
+                        (content_format, post["id"]),
+                    )
+                    changed_any = True
+                if changed_any and not source_type:
+                    updated += 1
+
+            conn.execute(
+                "INSERT INTO logs (post_id, level, message) VALUES (?, ?, ?)",
+                (None, "INFO", f"RSS article group #{rss_item_id} updated from Posts page."),
+            )
+
+    return updated
 
 
 def move_rss_group_main_schedule(rss_item_id, old_scheduled_at, new_scheduled_at):

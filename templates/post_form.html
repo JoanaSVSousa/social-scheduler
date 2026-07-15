@@ -86,11 +86,11 @@
 
     <div class="form-row">
         <label>
-            Repeat from date
+            Repeat from date (optional)
             <input type="date" name="repeat_date">
         </label>
         <label>
-            Repeat from time
+            Repeat from time (optional)
             <input type="time" name="repeat_time">
         </label>
         <label>
@@ -102,6 +102,7 @@
             <input type="number" name="repeat_interval_days" min="1" max="365" placeholder="14">
         </label>
     </div>
+    <span class="field-help">Leave repeat date/time empty to start from the scheduled date/time above.</span>
 
     {% if post %}
     <section class="source-panel">
