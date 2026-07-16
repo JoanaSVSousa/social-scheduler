@@ -87,7 +87,6 @@
             <col class="post-col-media">
             <col class="post-col-schedule">
             <col class="post-col-added">
-            <col class="post-col-hashtags">
             <col class="post-col-actions">
         </colgroup>
         <thead>
@@ -100,7 +99,6 @@
                 <th>Media</th>
                 <th>Schedule</th>
                 <th>Added</th>
-                <th>Hashtags</th>
                 <th></th>
             </tr>
         </thead>
@@ -154,7 +152,6 @@
                     {% endif %}
                 </td>
                 <td>{{ post.created_at_label }}</td>
-                <td>{{ post.hashtags }}</td>
                 <td class="actions">
                     {% if post.is_rss_group %}
                     <a class="button" href="{{ url_for('main.edit_rss_article', rss_item_id=post.rss_item_id) }}">Edit versions</a>
@@ -186,7 +183,7 @@
                 </td>
             </tr>
             {% else %}
-            <tr><td colspan="10">No posts found.</td></tr>
+            <tr><td colspan="9">No posts found.</td></tr>
             {% endfor %}
         </tbody>
     </table>

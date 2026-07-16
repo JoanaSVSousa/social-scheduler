@@ -298,7 +298,7 @@ table {
 }
 
 .posts-table {
-    min-width: 1160px;
+    min-width: 1040px;
     table-layout: fixed;
 }
 
@@ -307,7 +307,7 @@ table {
 }
 
 .post-col-title {
-    width: 35%;
+    width: 42%;
 }
 
 .post-col-platform {
@@ -324,13 +324,12 @@ table {
 }
 
 .post-col-schedule,
-.post-col-added,
-.post-col-hashtags {
+.post-col-added {
     width: 9%;
 }
 
 .post-col-actions {
-    width: 10%;
+    width: 12%;
 }
 
 th,
