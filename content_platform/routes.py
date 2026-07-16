@@ -25,6 +25,7 @@ from .models import (
 from .security import validate_csrf
 from .auth import is_logged_in, login_required, verify_user_credentials
 from .services.analytics import build_platform_counts, build_status_counts
+from .services.clock import app_now
 from .services.media import delete_media, get_media_for_post, get_media_for_posts, save_media_files
 from .services.publisher import process_publication_queue, publish_post_now, publish_rss_group_now
 from .services.rich_text import compose_publication_text
@@ -472,7 +473,7 @@ def _post_sort_options():
 
 
 def _build_dashboard_calendar(posts, schedules_by_post):
-    today = datetime.now()
+    today = app_now()
     year = _int_arg("year", today.year)
     month = _int_arg("month", today.month)
     if month < 1 or month > 12:

@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 
 from ..models import FORMAT_MEDIA_RULES
 from .media import get_media_for_post
@@ -6,19 +7,24 @@ from .media_optimizer import prepare_media_for_publish
 from .platform_publishers import is_platform_publishable, publish_to_platform
 from .scheduler import add_log, get_due_posts, get_post, mark_post_status
 from .schedules import get_due_schedules, has_pending_schedules, mark_schedule_status
-from .clock import app_minutes_ago_string
+from .clock import app_minutes_ago_string, app_now, app_now_string
+
+
+DEFAULT_PUBLICATION_LOOKBACK_MINUTES = 30
 
 
 def process_publication_queue():
+    checked_at = app_now_string()
     not_before = _publication_not_before()
     due_posts = get_due_posts(not_before=not_before)
     due_schedules = get_due_schedules(not_before=not_before)
     published = 0
 
     for schedule in due_schedules:
+        delay = _schedule_delay_minutes(schedule["scheduled_at"])
         result = publish_post_by_id(
             schedule["post_id"],
-            f"Scheduled recycled publish due at {schedule['scheduled_at']}.",
+            _scheduled_reason("Scheduled recycled publish", schedule["scheduled_at"], checked_at, delay),
             mark_post_published=False,
         )
         if result["ok"]:
@@ -32,18 +38,22 @@ def process_publication_queue():
                 mark_post_status(schedule["post_id"], "Failed")
 
     for post in due_posts:
-        result = publish_post(post, "Scheduled publish due now.")
+        delay = _schedule_delay_minutes(post["scheduled_at"])
+        result = publish_post(
+            post,
+            _scheduled_reason("Scheduled publish", post["scheduled_at"], checked_at, delay),
+        )
         if result["ok"]:
             published += 1
 
     if not due_posts and not due_schedules:
-        add_log(None, "INFO", "Publication queue checked. No posts due.")
+        add_log(None, "INFO", f"Publication queue checked at {checked_at}. No posts due.")
 
     return published
 
 
 def _publication_not_before():
-    value = os.environ.get("PUBLICATION_LOOKBACK_MINUTES", "").strip()
+    value = os.environ.get("PUBLICATION_LOOKBACK_MINUTES", str(DEFAULT_PUBLICATION_LOOKBACK_MINUTES)).strip()
     if not value:
         return None
     try:
@@ -53,6 +63,22 @@ def _publication_not_before():
     if minutes <= 0:
         return None
     return app_minutes_ago_string(minutes)
+
+
+def _scheduled_reason(label, scheduled_at, checked_at, delay_minutes):
+    delay_text = ""
+    if delay_minutes is not None:
+        delay_text = f" Delay: {delay_minutes} minute(s)."
+    return f"{label} due at {scheduled_at}; queue checked at {checked_at}.{delay_text}"
+
+
+def _schedule_delay_minutes(scheduled_at):
+    try:
+        scheduled_time = datetime.fromisoformat(str(scheduled_at).replace(" ", "T")[:16])
+    except (TypeError, ValueError):
+        return None
+    delay = app_now().replace(tzinfo=None) - scheduled_time
+    return max(0, int(delay.total_seconds() // 60))
 
 
 def publish_post_now(post_id):

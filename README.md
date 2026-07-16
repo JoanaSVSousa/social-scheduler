@@ -235,10 +235,10 @@ GitHub Actions schedules are not a permanently running worker, so publication is
 The workflow currently sets:
 
 ```txt
-PUBLICATION_LOOKBACK_MINUTES=180
+PUBLICATION_LOOKBACK_MINUTES=30
 ```
 
-That gives the job a 3-hour catch-up window while avoiding accidental publication of very old scheduled posts.
+That gives the job a 30-minute catch-up window. This is long enough for normal GitHub runner delays, but short enough to avoid silently publishing content hours after the intended schedule. Scheduled publish logs include the planned time, queue check time, and delay in minutes, which makes timezone or runner-delay issues easier to diagnose.
 
 Set these additional GitHub Actions repository secrets if scheduled publishing uses media uploads:
 
