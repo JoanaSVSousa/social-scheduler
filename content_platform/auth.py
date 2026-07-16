@@ -118,6 +118,7 @@ def should_require_login(endpoint):
         "main.login",
         "main.privacy_policy",
         "main.terms_of_service",
+        "main.trigger_daily_report",
         "main.meta_deauthorize",
         "main.meta_data_deletion",
         "main.data_deletion_status",

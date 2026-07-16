@@ -1,5 +1,6 @@
 from calendar import Calendar, month_name
 from datetime import datetime, timedelta, timezone
+import hmac
 import json
 import os
 import secrets
@@ -28,6 +29,7 @@ from .services.analytics import build_platform_counts, build_status_counts
 from .services.clock import app_now
 from .services.media import delete_media, get_media_for_post, get_media_for_posts, save_media_files
 from .services.publisher import process_publication_queue, publish_post_now, publish_rss_group_now
+from .services.reporting import send_daily_publication_report
 from .services.rich_text import compose_publication_text
 from .services.rss import (
     check_all_feeds,
@@ -154,6 +156,17 @@ def dashboard():
         status_counts=build_status_counts(posts),
         platform_counts=build_platform_counts(posts),
     )
+
+
+@bp.post("/internal/reports/daily")
+def trigger_daily_report():
+    expected_token = os.environ.get("DAILY_REPORT_RUN_TOKEN", "")
+    supplied_token = _bearer_token()
+    if not expected_token or not supplied_token or not hmac.compare_digest(supplied_token, expected_token):
+        abort(404)
+
+    send_daily_publication_report()
+    return jsonify({"ok": True, "message": "Daily publication report sent."})
 
 
 @bp.route("/settings/social-accounts")
@@ -1989,3 +2002,11 @@ def _safe_next_url():
 def _is_safe_feed_url(url):
     parsed = urlparse(url)
     return parsed.scheme in {"http", "https"} and bool(parsed.netloc) and len(url) <= 500
+
+
+def _bearer_token():
+    authorization = request.headers.get("Authorization", "")
+    prefix = "Bearer "
+    if not authorization.startswith(prefix):
+        return ""
+    return authorization[len(prefix) :].strip()

@@ -393,13 +393,35 @@ SMTP_FROM_EMAIL="your@email.com"
 REPORT_TO_EMAIL="team@email.com"
 ```
 
-The repository includes a GitHub Actions workflow for the daily report:
+In production, keep the report variables in the Render service environment:
+
+```bash
+APP_TIMEZONE="Europe/Lisbon"
+DATABASE_URL="postgresql://..."
+SECRET_KEY="..."
+SMTP_HOST="smtp.example.com"
+SMTP_PORT="587"
+SMTP_USERNAME="your@email.com"
+SMTP_PASSWORD="your-password"
+SMTP_FROM_EMAIL="your@email.com"
+REPORT_TO_EMAIL="team@email.com"
+DAILY_REPORT_RUN_TOKEN="long-random-shared-token"
+```
+
+The repository includes a GitHub Actions workflow that acts only as the daily trigger:
 
 ```txt
 .github/workflows/daily-publication-report.yml
 ```
 
-It runs once per day and can also be triggered manually from GitHub Actions. Add the SMTP variables above as GitHub repository secrets, plus the same `DATABASE_URL` and `SECRET_KEY` used by the production app.
+It runs once per day and can also be triggered manually from GitHub Actions. GitHub does not need database or SMTP secrets. It only needs:
+
+```bash
+DAILY_REPORT_ENDPOINT="https://social-scheduler-u1we.onrender.com/internal/reports/daily"
+DAILY_REPORT_RUN_TOKEN="the-same-token-saved-in-render"
+```
+
+When GitHub calls the endpoint, Render reads its own environment variables and sends the email from the running app.
 
 ## Project Structure
 
