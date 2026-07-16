@@ -10,7 +10,7 @@ from urllib.request import Request, urlopen
 from urllib.parse import unquote, urlparse
 
 from ..database import get_connection, insert_and_get_id
-from ..models import default_content_format
+from ..models import default_content_format, source_type_label
 from .scheduler import add_log
 
 
@@ -420,7 +420,7 @@ def _render_copy_template(template, feed, entry, platform, content_type):
         "feed": (feed or {}).get("name", ""),
         "platform": platform,
         "hashtags": (feed or {}).get("default_hashtags", ""),
-        "type": content_type,
+        "type": source_type_label(content_type),
     }
 
     def replace(match):

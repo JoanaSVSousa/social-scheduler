@@ -31,7 +31,7 @@
                 </td>
                 <td>{{ group.feed_name }}</td>
                 <td>{{ group.platforms or "-" }}</td>
-                <td><span class="type-pill {{ group.content_type|lower }}">{{ group.content_type }}</span></td>
+                <td><span class="type-pill {{ group.content_type|lower }}">{{ source_type_label(group.content_type) }}</span></td>
                 <td>{{ group.draft_count or 0 }} / {{ group.post_count or 0 }}</td>
                 <td>{{ group.created_at }}</td>
                 <td>

@@ -6,6 +6,7 @@ from flask import Flask, abort, jsonify, redirect, request, url_for
 
 from .auth import is_admin, is_logged_in, should_require_admin, should_require_login
 from .database import DEFAULT_DB_PATH, init_db
+from .models import source_type_label
 from .routes import bp
 from .security import add_security_headers, csrf_token
 
@@ -26,7 +27,13 @@ def create_app():
     app.config["SESSION_COOKIE_SECURE"] = os.environ.get("SESSION_COOKIE_SECURE", "1") == "1"
 
     init_db(app.config["DATABASE"])
-    app.context_processor(lambda: {"csrf_token": csrf_token, "can_manage_integrations": is_admin()})
+    app.context_processor(
+        lambda: {
+            "csrf_token": csrf_token,
+            "can_manage_integrations": is_admin(),
+            "source_type_label": source_type_label,
+        }
+    )
     app.after_request(add_security_headers)
 
     @app.before_request

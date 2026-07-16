@@ -17,6 +17,7 @@ from .models import (
     PLATFORM_MEDIA_GUIDES,
     PLATFORMS,
     PLATFORM_CONTENT_LIMITS,
+    SOURCE_TYPES,
     STATUSES,
     Post,
     content_limit_for_post,
@@ -199,7 +200,7 @@ def social_account_settings():
 @bp.route("/posts")
 def posts():
     refresh_rss_content_types()
-    source_types = ["Regular", "News"]
+    source_types = SOURCE_TYPES
     media_kinds = {
         "story": "Stories",
         "video": "Videos",
@@ -251,16 +252,8 @@ def posts():
 @bp.post("/posts/library-update")
 def update_posts_library():
     validate_csrf()
-    source_types = {"Regular", "News"}
+    source_types = set(SOURCE_TYPES)
     action = request.form.get("action", "")
-
-    if action == "quick_source":
-        source_type = request.form.get("source_type", "")
-        if source_type not in source_types:
-            abort(400)
-        updated = update_library_post_fields([request.form.get("post_id", "")], source_type=source_type)
-        flash("Post type updated." if updated else "No post was updated.", "success" if updated else "warning")
-        return redirect(_posts_redirect_args())
 
     if action == "bulk_update":
         selected_ids = request.form.getlist("selected_post_ids")
@@ -701,7 +694,7 @@ def edit_rss_article(rss_item_id):
             abort(400)
         item, posts = sync_rss_group_platforms(rss_item_id, selected_platforms)
         content_type = request.form.get("content_type", item["content_type"])
-        if content_type not in {"Regular", "News"}:
+        if content_type not in SOURCE_TYPES:
             abort(400)
         update_rss_group_content_type(rss_item_id, content_type)
         item, posts = get_rss_group(rss_item_id)
@@ -1787,7 +1780,7 @@ def _post_from_form():
         abort(400)
     if status not in STATUSES:
         abort(400)
-    if source_type not in {"Regular", "News"}:
+    if source_type not in SOURCE_TYPES:
         abort(400)
     if content_format not in PLATFORM_CONTENT_FORMATS.get(platform, []):
         abort(400)

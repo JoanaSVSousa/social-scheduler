@@ -4,6 +4,11 @@ from typing import Optional
 
 PLATFORMS = ["Instagram", "Facebook", "LinkedIn", "X", "Threads", "Bluesky", "YouTube Shorts", "TikTok"]
 STATUSES = ["Draft", "Scheduled", "Published", "Failed"]
+SOURCE_TYPES = ["Regular", "News"]
+SOURCE_TYPE_LABELS = {
+    "Regular": "All Green",
+    "News": "News",
+}
 
 PLATFORM_CONTENT_LIMITS = {
     "Instagram": 2200,
@@ -115,6 +120,10 @@ FORMAT_MEDIA_RULES = {
 
 def default_content_format(platform):
     return PLATFORM_CONTENT_FORMATS.get(platform, ["Post"])[0]
+
+
+def source_type_label(source_type):
+    return SOURCE_TYPE_LABELS.get(source_type, source_type or "")
 
 
 def content_character_limit(platform):

@@ -59,7 +59,7 @@
         <label>
             Source type
             <select name="source_type" id="source-type-select" required>
-                <option value="Regular" {% if not post or post.source_type == "Regular" %}selected{% endif %}>Regular</option>
+                <option value="Regular" {% if not post or post.source_type == "Regular" %}selected{% endif %}>All Green</option>
                 <option value="News" {% if post and post.source_type == "News" %}selected{% endif %}>News</option>
             </select>
         </label>

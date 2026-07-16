@@ -223,7 +223,7 @@ Supported placeholders:
 - `{feed}`
 - `{platform}`
 - `{hashtags}`
-- `{type}` for `Regular` or `News`
+- `{type}` for `All Green` or `News`
 
 Example:
 

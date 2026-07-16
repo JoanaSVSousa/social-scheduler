@@ -6,6 +6,7 @@ import smtplib
 import ssl
 
 from ..database import get_connection
+from ..models import source_type_label
 from .analytics import build_status_counts
 from .clock import app_now
 from .scheduler import get_all_posts, get_logs
@@ -74,7 +75,7 @@ def build_daily_publication_report(report_date=None):
             scheduled_at = _display_time(item["scheduled_at"])
             lines.append(
                 f"- {scheduled_at} | {item['platform']} | {item['content_format']} | "
-                f"{item['source_type']} | {item['status']} | {item['title']} | {item['source']}"
+                f"{source_type_label(item['source_type'])} | {item['status']} | {item['title']} | {item['source']}"
             )
     else:
         lines.append("- No posts scheduled for today.")

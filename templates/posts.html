@@ -26,7 +26,7 @@
     <select name="source_type">
         <option value="">All types</option>
         {% for source_type in source_types %}
-        <option value="{{ source_type }}" {% if filters.source_type == source_type %}selected{% endif %}>{{ source_type }}</option>
+        <option value="{{ source_type }}" {% if filters.source_type == source_type %}selected{% endif %}>{{ source_type_label(source_type) }}</option>
         {% endfor %}
     </select>
     <select name="media_kind">
@@ -62,7 +62,7 @@
     <select name="source_type">
         <option value="">Change type...</option>
         {% for source_type in source_types %}
-        <option value="{{ source_type }}">{{ source_type }}</option>
+        <option value="{{ source_type }}">{{ source_type_label(source_type) }}</option>
         {% endfor %}
     </select>
     <select name="content_format" data-bulk-format>
@@ -84,7 +84,6 @@
             <col class="post-col-title">
             <col class="post-col-platform">
             <col class="post-col-status">
-            <col class="post-col-type">
             <col class="post-col-media">
             <col class="post-col-schedule">
             <col class="post-col-added">
@@ -98,7 +97,6 @@
                 <th>Title</th>
                 <th>Platform</th>
                 <th>Status</th>
-                <th>Type</th>
                 <th>Media</th>
                 <th>Schedule</th>
                 <th>Added</th>
@@ -123,32 +121,13 @@
                     {% else %}
                     <a class="table-link post-title-link" href="{{ url_for('main.edit_post', post_id=post.id) }}">{{ post.title }}</a>
                     {% endif %}
+                    <div class="post-title-meta">
+                        <span class="type-pill {{ post.source_type|lower }}">{{ source_type_label(post.source_type) }}</span>
+                    </div>
                     <small class="post-excerpt">{{ post.content[:260] }}{% if post.content|length > 260 %}...{% endif %}</small>
                 </td>
                 <td>{{ post.platform }}</td>
                 <td><span class="status {{ post.status|lower }}">{{ post.status }}</span></td>
-                <td>
-                    {% if post.is_rss_group %}
-                    <span class="type-pill {{ post.source_type|lower }}">{{ post.source_type }}</span>
-                    {% else %}
-                    <form class="inline-select-form" method="post" action="{{ url_for('main.update_posts_library') }}">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <input type="hidden" name="action" value="quick_source">
-                        <input type="hidden" name="post_id" value="{{ post.id }}">
-                        <input type="hidden" name="return_search" value="{{ filters.search }}">
-                        <input type="hidden" name="return_platform" value="{{ filters.platform }}">
-                        <input type="hidden" name="return_status" value="{{ filters.status }}">
-                        <input type="hidden" name="return_source_type" value="{{ filters.source_type }}">
-                        <input type="hidden" name="return_media_kind" value="{{ filters.media_kind }}">
-                        <input type="hidden" name="return_sort" value="{{ filters.sort }}">
-                        <select name="source_type" class="compact-select {{ post.source_type|lower }}" onchange="this.form.submit()">
-                            {% for source_type in source_types %}
-                            <option value="{{ source_type }}" {% if post.source_type == source_type %}selected{% endif %}>{{ source_type }}</option>
-                            {% endfor %}
-                        </select>
-                    </form>
-                    {% endif %}
-                </td>
                 <td>
                     {% if post.is_rss_group %}
                     <span class="media-count">{{ post.media_total }} file{% if post.media_total != 1 %}s{% endif %}</span>
@@ -207,7 +186,7 @@
                 </td>
             </tr>
             {% else %}
-            <tr><td colspan="11">No posts found.</td></tr>
+            <tr><td colspan="10">No posts found.</td></tr>
             {% endfor %}
         </tbody>
     </table>

@@ -11,7 +11,7 @@
 
 <section class="source-panel">
     <strong>{{ item.title }}</strong>
-    <small><span class="type-pill {{ item.content_type|lower }}">{{ item.content_type }}</span></small>
+    <small><span class="type-pill {{ item.content_type|lower }}">{{ source_type_label(item.content_type) }}</span></small>
     <span>{{ item.url }}</span>
     {% if item.image_url %}
     <div class="source-media-preview">
@@ -33,7 +33,7 @@
             <label>
                 Article type
                 <select name="content_type">
-                    <option value="Regular" {% if item.content_type == "Regular" %}selected{% endif %}>Regular</option>
+                    <option value="Regular" {% if item.content_type == "Regular" %}selected{% endif %}>All Green</option>
                     <option value="News" {% if item.content_type == "News" %}selected{% endif %}>News</option>
                 </select>
             </label>
