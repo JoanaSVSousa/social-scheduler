@@ -210,6 +210,32 @@ When `APP_BASE_URL` is set, the RSS job first calls `/healthz` to wake/check the
 
 Render Cron Jobs can also run the same command if the account plan supports them. In that case, the cron service needs the same environment variables as the web service, especially `DATABASE_URL` and `APP_BASE_URL`.
 
+### RSS Copy Templates
+
+Each RSS feed can define a copy template. When a new article is imported, Supernova uses that template to create the draft text for each selected network. If the template is empty, the app keeps the default behavior: RSS summary plus source link.
+
+Supported placeholders:
+
+- `{title}`
+- `{summary}`
+- `{summary:180}` to trim a field to a maximum number of characters
+- `{url}`
+- `{feed}`
+- `{platform}`
+- `{hashtags}`
+- `{type}` for `Regular` or `News`
+
+Example:
+
+```txt
+{summary:220}
+
+Fonte: {url}
+{hashtags}
+```
+
+This keeps recurring feeds consistent while still allowing manual network-by-network editing afterwards.
+
 ## Scheduled Publishing Task
 
 The repository also includes a GitHub Actions workflow that checks the publication queue every 5 minutes:
@@ -342,6 +368,20 @@ Preview without sending:
 python3 scripts/send_dashboard_report.py --dry-run
 ```
 
+Send the daily publication plan instead:
+
+```bash
+python3 scripts/send_dashboard_report.py --daily
+```
+
+Preview a specific day:
+
+```bash
+python3 scripts/send_dashboard_report.py --daily --date 2026-07-16 --dry-run
+```
+
+The daily report lists the posts scheduled for that date, including time, platform, format, content type, status, title, and whether the item is a primary or recycled schedule.
+
 Required SMTP variables:
 
 ```bash
@@ -352,6 +392,14 @@ SMTP_PASSWORD="your-password"
 SMTP_FROM_EMAIL="your@email.com"
 REPORT_TO_EMAIL="team@email.com"
 ```
+
+The repository includes a GitHub Actions workflow for the daily report:
+
+```txt
+.github/workflows/daily-publication-report.yml
+```
+
+It runs once per day and can also be triggered manually from GitHub Actions. Add the SMTP variables above as GitHub repository secrets, plus the same `DATABASE_URL` and `SECRET_KEY` used by the production app.
 
 ## Project Structure
 

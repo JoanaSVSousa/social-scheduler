@@ -37,6 +37,14 @@
         Default hashtags
         <input name="default_hashtags" maxlength="400" value="{{ feed.default_hashtags }}">
     </label>
+    <label>
+        Copy template
+        <textarea name="copy_template" rows="8" maxlength="2200">{{ feed.copy_template or "" }}</textarea>
+    </label>
+    <small class="muted">
+        Use placeholders like {summary:220}, {url}, {hashtags}, {platform}, and {type}. If this is empty,
+        RSS imports use the default summary + source format.
+    </small>
     <div class="form-actions">
         <button class="button primary" type="submit">Save feed</button>
         <a class="button" href="{{ url_for('main.rss_feeds') }}">Cancel</a>

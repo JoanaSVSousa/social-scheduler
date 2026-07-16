@@ -43,6 +43,18 @@
             Default hashtags
             <input name="default_hashtags" maxlength="400" placeholder="#algarve #news">
         </label>
+        <label>
+            Copy template
+            <textarea
+                name="copy_template"
+                rows="7"
+                maxlength="2200"
+                placeholder="{summary:220}&#10;&#10;Fonte: {url}&#10;{hashtags}"
+            ></textarea>
+        </label>
+        <small class="muted">
+            Placeholders: {title}, {summary}, {summary:180}, {url}, {feed}, {platform}, {hashtags}, {type}.
+        </small>
         <div class="form-actions">
             <button class="button primary" type="submit">Add feed</button>
         </div>
@@ -62,6 +74,9 @@
                     </div>
                     <span>{{ feed.url }}</span>
                     <small>{{ feed.target_platforms }}{% if feed.default_hashtags %} · {{ feed.default_hashtags }}{% endif %} · {{ feed.content_type }}</small>
+                    {% if feed.copy_template %}
+                    <small>Copy template: active</small>
+                    {% endif %}
                     <small>Last checked: {{ feed.last_checked_at or "Never" }}</small>
                     <small>Last result: {{ feed.last_check_message or "No check result yet." }}</small>
                     <small>{{ feed.last_created_count or 0 }} created · {{ feed.last_skipped_count or 0 }} skipped · {{ feed.last_error_count or 0 }} errors</small>

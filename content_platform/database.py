@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS rss_feeds (
     url TEXT NOT NULL UNIQUE,
     target_platforms TEXT NOT NULL,
     default_hashtags TEXT DEFAULT '',
+    copy_template TEXT DEFAULT '',
     content_type TEXT NOT NULL DEFAULT 'Regular',
     is_active INTEGER NOT NULL DEFAULT 1,
     last_checked_at TEXT,
@@ -140,6 +141,7 @@ CREATE TABLE IF NOT EXISTS rss_feeds (
     url TEXT NOT NULL UNIQUE,
     target_platforms TEXT NOT NULL,
     default_hashtags TEXT DEFAULT '',
+    copy_template TEXT DEFAULT '',
     content_type TEXT NOT NULL DEFAULT 'Regular',
     is_active INTEGER NOT NULL DEFAULT 1,
     last_checked_at TEXT,
@@ -242,6 +244,7 @@ def init_db(db_path=None):
         _ensure_column(conn, "posts", "source_type", "TEXT NOT NULL DEFAULT 'Regular'")
         _ensure_column(conn, "media_assets", "public_url", "TEXT DEFAULT ''")
         _ensure_column(conn, "rss_feeds", "content_type", "TEXT NOT NULL DEFAULT 'Regular'")
+        _ensure_column(conn, "rss_feeds", "copy_template", "TEXT DEFAULT ''")
         _ensure_column(conn, "rss_feeds", "last_check_status", "TEXT NOT NULL DEFAULT 'Never checked'")
         _ensure_column(conn, "rss_feeds", "last_check_message", "TEXT DEFAULT ''")
         _ensure_column(conn, "rss_feeds", "last_created_count", "INTEGER NOT NULL DEFAULT 0")

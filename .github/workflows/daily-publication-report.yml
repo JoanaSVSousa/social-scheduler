@@ -1,0 +1,41 @@
+name: Send daily publication report
+
+on:
+  schedule:
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: daily-publication-report
+  cancel-in-progress: false
+
+jobs:
+  daily-publication-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      APP_TIMEZONE: ${{ secrets.APP_TIMEZONE || 'Europe/Lisbon' }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT || '587' }}
+      SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      SMTP_FROM_EMAIL: ${{ secrets.SMTP_FROM_EMAIL }}
+      REPORT_TO_EMAIL: ${{ secrets.REPORT_TO_EMAIL }}
+      DAILY_REPORT_EMAIL_SUBJECT: ${{ secrets.DAILY_REPORT_EMAIL_SUBJECT }}
+      FLASK_DEBUG: "0"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Send daily publication report
+        run: python scripts/send_dashboard_report.py --daily

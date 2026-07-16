@@ -1645,6 +1645,7 @@ def rss_feeds():
             url,
             platforms,
             request.form.get("default_hashtags", "").strip(),
+            request.form.get("copy_template", "").strip(),
         )
         if created:
             flash("RSS feed added.", "success")
@@ -1720,6 +1721,7 @@ def edit_rss_feed(feed_id):
             url,
             platforms,
             request.form.get("default_hashtags", "").strip(),
+            request.form.get("copy_template", "").strip(),
         )
         if updated:
             flash("RSS feed updated.", "success")

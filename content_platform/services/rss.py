@@ -30,7 +30,7 @@ def get_feed(feed_id):
     return _feed_with_health(feed) if feed else None
 
 
-def create_feed(name, url, target_platforms, default_hashtags):
+def create_feed(name, url, target_platforms, default_hashtags, copy_template=""):
     content_type = classify_content_type(url)
     with get_connection() as conn:
         existing = conn.execute("SELECT id FROM rss_feeds WHERE url = ?", (url,)).fetchone()
@@ -38,16 +38,16 @@ def create_feed(name, url, target_platforms, default_hashtags):
             return False
         conn.execute(
             """
-            INSERT INTO rss_feeds (name, url, target_platforms, default_hashtags, content_type)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO rss_feeds (name, url, target_platforms, default_hashtags, copy_template, content_type)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (name, url, ",".join(target_platforms), default_hashtags, content_type),
+            (name, url, ",".join(target_platforms), default_hashtags, copy_template, content_type),
         )
 
     return True
 
 
-def update_feed(feed_id, name, url, target_platforms, default_hashtags):
+def update_feed(feed_id, name, url, target_platforms, default_hashtags, copy_template=""):
     content_type = classify_content_type(url)
     with get_connection() as conn:
         existing = conn.execute(
@@ -59,10 +59,10 @@ def update_feed(feed_id, name, url, target_platforms, default_hashtags):
         conn.execute(
             """
             UPDATE rss_feeds
-            SET name = ?, url = ?, target_platforms = ?, default_hashtags = ?, content_type = ?
+            SET name = ?, url = ?, target_platforms = ?, default_hashtags = ?, copy_template = ?, content_type = ?
             WHERE id = ?
             """,
-            (name, url, ",".join(target_platforms), default_hashtags, content_type, feed_id),
+            (name, url, ",".join(target_platforms), default_hashtags, copy_template, content_type, feed_id),
         )
     return True
 
@@ -338,7 +338,7 @@ def _create_rss_draft(conn, feed, entry, platform, rss_item_id, content_type):
         """,
         (
             _trim(entry["title"], 120),
-            _draft_content(entry),
+            _draft_content(entry, feed, platform, content_type),
             feed["default_hashtags"] or "",
             platform,
             default_content_format(platform),
@@ -398,11 +398,40 @@ def _first_image_from_html(value):
     return unescape(match.group(1)).strip() if match else ""
 
 
-def _draft_content(entry):
+def _draft_content(entry, feed=None, platform="", content_type="Regular"):
+    copy_template = (feed or {}).get("copy_template", "").strip()
+    if copy_template:
+        return _render_copy_template(copy_template, feed, entry, platform, content_type)
+
     summary = _trim(_clean_summary(entry.get("summary") or ""), 800)
     if summary:
         return f"{summary}\n\nSource: {entry['link']}"
     return f"Source: {entry['link']}"
+
+
+def _render_copy_template(template, feed, entry, platform, content_type):
+    summary = _clean_summary(entry.get("summary") or "")
+    values = {
+        "title": entry.get("title", ""),
+        "summary": summary,
+        "excerpt": summary,
+        "url": entry.get("link", ""),
+        "source": entry.get("link", ""),
+        "feed": (feed or {}).get("name", ""),
+        "platform": platform,
+        "hashtags": (feed or {}).get("default_hashtags", ""),
+        "type": content_type,
+    }
+
+    def replace(match):
+        value = values.get(match.group(1).lower(), "")
+        limit = match.group(2)
+        if limit and value:
+            value = _trim(value, int(limit))
+        return value
+
+    rendered = re.sub(r"\{([a-z_]+)(?::(\d{1,4}))?\}", replace, template)
+    return _trim(rendered.strip(), 2200) or _draft_content(entry)
 
 
 def _text(element, selector, ns=None):
