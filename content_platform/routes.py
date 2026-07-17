@@ -913,7 +913,7 @@ def remove_media(media_id):
 def remove_post(post_id):
     validate_csrf()
     delete_post(post_id)
-    return redirect(url_for("main.posts"))
+    return redirect(_posts_redirect_args())
 
 
 @bp.post("/posts/<int:post_id>/publish-now")
@@ -924,7 +924,7 @@ def publish_single_post_now(post_id):
         flash("Post published successfully.", "success")
     else:
         flash(f"Publication failed: {result['message']}", "warning")
-    return redirect(url_for("main.posts"))
+    return redirect(_posts_redirect_args())
 
 
 @bp.post("/rss/articles/<int:rss_item_id>/delete")
@@ -932,7 +932,7 @@ def remove_rss_article(rss_item_id):
     validate_csrf()
     delete_rss_group(rss_item_id)
     flash("RSS article and its network versions deleted.", "success")
-    return redirect(url_for("main.posts"))
+    return redirect(_posts_redirect_args())
 
 
 @bp.post("/rss/articles/<int:rss_item_id>/publish-now")
@@ -950,7 +950,7 @@ def publish_rss_article_now(rss_item_id):
         flash(_publish_group_summary("", result), "warning")
     else:
         flash("Publication failed for every version. Check logs.", "warning")
-    return redirect(url_for("main.posts"))
+    return redirect(_posts_redirect_args())
 
 
 @bp.post("/queue/process")

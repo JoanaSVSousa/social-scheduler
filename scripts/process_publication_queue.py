@@ -10,6 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from content_platform import create_app
+from content_platform.services.clock import app_now_string
 from content_platform.services.publisher import process_publication_queue
 
 
@@ -31,6 +32,8 @@ def main():
     app = create_app()
     with app.app_context():
         wake_web_service()
+        lookback = os.environ.get("PUBLICATION_LOOKBACK_MINUTES", "1440")
+        print(f"Publication queue time: {app_now_string()}. Catch-up window: {lookback} minute(s).")
         published = process_publication_queue()
         print(f"Publication queue checked: {published} item(s) published.")
 

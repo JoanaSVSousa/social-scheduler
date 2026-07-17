@@ -10,7 +10,7 @@ from .schedules import get_due_schedules, has_pending_schedules, mark_schedule_s
 from .clock import app_minutes_ago_string, app_now, app_now_string
 
 
-DEFAULT_PUBLICATION_LOOKBACK_MINUTES = 30
+DEFAULT_PUBLICATION_LOOKBACK_MINUTES = 1440
 
 
 def process_publication_queue():
@@ -47,7 +47,8 @@ def process_publication_queue():
             published += 1
 
     if not due_posts and not due_schedules:
-        add_log(None, "INFO", f"Publication queue checked at {checked_at}. No posts due.")
+        window = not_before or "unlimited"
+        add_log(None, "INFO", f"Publication queue checked at {checked_at}. No posts due since {window}.")
 
     return published
 
