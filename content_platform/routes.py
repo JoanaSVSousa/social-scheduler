@@ -255,10 +255,31 @@ def update_posts_library():
     source_types = set(SOURCE_TYPES)
     action = request.form.get("action", "")
 
+    selected_ids = request.form.getlist("selected_post_ids")
+    post_ids = [item for item in selected_ids if item.isdigit()]
+    rss_item_ids = [
+        item.removeprefix("rss:")
+        for item in selected_ids
+        if item.startswith("rss:") and item.removeprefix("rss:").isdigit()
+    ]
+
+    if action == "bulk_delete":
+        if not selected_ids:
+            flash("Select at least one post first.", "warning")
+            return redirect(_posts_redirect_args())
+
+        deleted = 0
+        for post_id in post_ids:
+            delete_post(post_id)
+            deleted += 1
+        for rss_item_id in rss_item_ids:
+            delete_rss_group(rss_item_id)
+            deleted += 1
+
+        flash(f"Deleted {deleted} selected item(s).", "success" if deleted else "warning")
+        return redirect(_posts_redirect_args())
+
     if action == "bulk_update":
-        selected_ids = request.form.getlist("selected_post_ids")
-        post_ids = [item for item in selected_ids if item.isdigit()]
-        rss_item_ids = [item.removeprefix("rss:") for item in selected_ids if item.startswith("rss:")]
         platform = request.form.get("platform", "")
         source_type = request.form.get("source_type", "")
         content_format = request.form.get("content_format", "")

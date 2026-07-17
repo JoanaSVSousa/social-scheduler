@@ -54,7 +54,7 @@
 
 <form id="bulk-posts-form" class="bulk-toolbar" method="post" action="{{ url_for('main.update_posts_library') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <input type="hidden" name="action" value="bulk_update">
+    <input type="hidden" name="action" value="bulk_update" data-bulk-action>
     <input type="hidden" name="return_search" value="{{ filters.search }}">
     <input type="hidden" name="return_platform" value="{{ filters.platform }}">
     <input type="hidden" name="return_status" value="{{ filters.status }}">
@@ -82,7 +82,8 @@
             {% endfor %}
         {% endfor %}
     </select>
-    <button class="button" type="submit">Apply</button>
+    <button class="button" type="submit" data-bulk-submit="bulk_update">Apply</button>
+    <button class="button danger" type="submit" data-bulk-submit="bulk_delete">Delete selected</button>
 </form>
 
 <div class="table-wrap posts-table-wrap">
@@ -221,6 +222,8 @@ if (filterForm) {
 const allCheckbox = document.querySelector("[data-select-all]");
 const rowCheckboxes = Array.from(document.querySelectorAll("[data-row-select]"));
 const selectedCount = document.querySelector("[data-selected-count]");
+const bulkAction = document.querySelector("[data-bulk-action]");
+const bulkForm = document.querySelector("#bulk-posts-form");
 function updateSelectedCount() {
     const checked = rowCheckboxes.filter((checkbox) => checkbox.checked).length;
     if (selectedCount) {
@@ -241,6 +244,32 @@ if (allCheckbox) {
 }
 rowCheckboxes.forEach((checkbox) => checkbox.addEventListener("change", updateSelectedCount));
 updateSelectedCount();
+
+document.querySelectorAll("[data-bulk-submit]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+        const action = button.dataset.bulkSubmit;
+        if (bulkAction) {
+            bulkAction.value = action;
+        }
+        if (action === "bulk_delete") {
+            const selected = rowCheckboxes.filter((checkbox) => checkbox.checked).length;
+            if (!selected) {
+                event.preventDefault();
+                return;
+            }
+            if (!window.confirm(`Delete ${selected} selected item(s)? This cannot be undone.`)) {
+                event.preventDefault();
+            }
+        }
+    });
+});
+if (bulkForm) {
+    bulkForm.addEventListener("submit", () => {
+        if (bulkAction && !bulkAction.value) {
+            bulkAction.value = "bulk_update";
+        }
+    });
+}
 
 const bulkPlatform = document.querySelector("[data-bulk-platform]");
 const bulkFormat = document.querySelector("[data-bulk-format]");
