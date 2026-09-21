@@ -17,12 +17,13 @@
         <nav>
             <a href="{{ url_for('main.dashboard') }}">Dashboard</a>
             <a href="{{ url_for('main.posts') }}">Posts</a>
+            <a href="{{ url_for('main.scheduled') }}">Scheduled</a>
             {% if can_manage_integrations %}
             <a href="{{ url_for('main.rss_feeds') }}">RSS</a>
             <a href="{{ url_for('main.social_account_settings') }}">API Accounts</a>
             {% endif %}
             <a href="{{ url_for('main.logs') }}">Logs</a>
-            <a class="button" href="{{ url_for('main.new_post') }}">New Post</a>
+            {% if not read_only_view %}<a class="button" href="{{ url_for('main.new_post') }}">New Post</a>{% endif %}
             {% if session.get("admin_authenticated") %}
             <form method="post" action="{{ url_for('main.logout') }}" class="nav-form">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

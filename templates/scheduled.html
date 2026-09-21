@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="panel" id="scheduled-view" data-endpoint="{{ url_for('main.scheduled_data') }}" aria-busy="true">
+    <h1>Scheduled</h1>
+    <p>Consulta de ocorrências pendentes, por data agendada. O estado da ocorrência pode diferir do estado do post.</p>
+    <p id="scheduled-status" role="status" aria-live="polite">A carregar agendamentos…</p>
+    <noscript>Active JavaScript para consultar os agendamentos.</noscript>
+    <div id="scheduled-results"></div>
+</section>
+<script src="{{ url_for('static', filename='scheduled.js') }}" defer></script>
+{% endblock %}

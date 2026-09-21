@@ -8,7 +8,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlparse
 from urllib.request import Request, urlopen
 
-from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, session, url_for
+from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, session, url_for
 
 from .models import (
     FORMAT_MEDIA_GUIDES,
@@ -28,6 +28,7 @@ from .security import validate_csrf
 from .auth import is_logged_in, login_required, verify_user_credentials
 from .services.analytics import build_platform_counts, build_status_counts
 from .services.clock import app_now
+from .services.scheduled_view import list_scheduled_occurrences
 from .services.media import delete_media, get_media_for_post, get_media_for_posts, save_media_files
 from .services.publisher import process_publication_queue, publish_post_now, publish_rss_group_now
 from .services.reporting import send_daily_publication_report
@@ -195,6 +196,23 @@ def social_account_settings():
         },
         platforms=PLATFORMS,
     )
+
+
+@bp.get("/scheduled")
+def scheduled():
+    return render_template("scheduled.html", read_only_view=True)
+
+
+@bp.get("/api/scheduled")
+def scheduled_data():
+    try:
+        response = jsonify(posts=list_scheduled_occurrences())
+    except Exception:
+        current_app.logger.exception("Unable to read scheduled posts")
+        response = jsonify(error="Não foi possível consultar os agendamentos.")
+        response.status_code = 503
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @bp.route("/posts")
