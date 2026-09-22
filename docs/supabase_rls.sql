@@ -11,6 +11,7 @@ ALTER TABLE IF EXISTS public.rss_feeds ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.rss_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.post_schedules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.social_accounts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.agent_operations ENABLE ROW LEVEL SECURITY;
 
 REVOKE ALL ON TABLE public.posts FROM anon, authenticated;
 REVOKE ALL ON TABLE public.logs FROM anon, authenticated;
@@ -19,6 +20,7 @@ REVOKE ALL ON TABLE public.rss_feeds FROM anon, authenticated;
 REVOKE ALL ON TABLE public.rss_items FROM anon, authenticated;
 REVOKE ALL ON TABLE public.post_schedules FROM anon, authenticated;
 REVOKE ALL ON TABLE public.social_accounts FROM anon, authenticated;
+REVOKE ALL ON TABLE public.agent_operations FROM PUBLIC, anon, authenticated;
 
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated;
 

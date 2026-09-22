@@ -239,6 +239,26 @@ def insert_and_get_id(conn, query, params=()):
 def init_db(db_path=None):
     with get_connection(db_path) as conn:
         conn.executescript(POSTGRES_SCHEMA if conn.dialect == "postgres" else SQLITE_SCHEMA)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS agent_operations (
+                operation_id TEXT PRIMARY KEY,
+                agent_id TEXT NOT NULL,
+                client_request_id TEXT NOT NULL,
+                request_hash TEXT NOT NULL,
+                post_id INTEGER NOT NULL,
+                reason TEXT NOT NULL,
+                response_json TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (agent_id, client_request_id)
+            )
+        """)
+        if conn.dialect == "postgres":
+            # Audit receipts contain post content; never expose them through Supabase's public API.
+            conn.execute("ALTER TABLE agent_operations ENABLE ROW LEVEL SECURITY")
+            conn.execute("REVOKE ALL ON TABLE agent_operations FROM PUBLIC")
+            for role in ("anon", "authenticated"):
+                if conn.execute("SELECT 1 FROM pg_roles WHERE rolname = ?", (role,)).fetchone():
+                    conn.execute(f"REVOKE ALL ON TABLE agent_operations FROM {role}")
         _ensure_column(conn, "posts", "content_format", "TEXT NOT NULL DEFAULT 'Feed Post'")
         _ensure_column(conn, "posts", "rss_item_id", "INTEGER")
         _ensure_column(conn, "posts", "source_type", "TEXT NOT NULL DEFAULT 'Regular'")

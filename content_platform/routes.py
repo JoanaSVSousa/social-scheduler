@@ -39,7 +39,6 @@ from .services.rss import (
     delete_feed,
     get_feed,
     list_feeds,
-    refresh_rss_content_types,
     update_feed,
 )
 from .services.rss_groups import (
@@ -141,8 +140,8 @@ def data_deletion_status(code):
 
 
 @bp.route("/")
+@bp.get("/dashboard")
 def dashboard():
-    refresh_rss_content_types()
     posts = get_all_posts()
     post_ids = [post["id"] for post in posts]
     media_by_post = get_media_for_posts(post_ids)
@@ -217,7 +216,6 @@ def scheduled_data():
 
 @bp.route("/posts")
 def posts():
-    refresh_rss_content_types()
     source_types = SOURCE_TYPES
     media_kinds = {
         "story": "Stories",

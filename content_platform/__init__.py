@@ -8,6 +8,7 @@ from .auth import is_admin, is_logged_in, should_require_admin, should_require_l
 from .database import DEFAULT_DB_PATH, init_db
 from .models import source_type_label
 from .routes import bp
+from .agent_api import bp as agent_api_bp
 from .security import add_security_headers, csrf_token
 
 
@@ -38,6 +39,8 @@ def create_app():
 
     @app.before_request
     def require_app_login():
+        if request.blueprint == "agent_api":
+            return None  # This blueprint requires scoped Bearer authentication.
         if should_require_login(request.endpoint) and not is_logged_in():
             return redirect(url_for("main.login", next=request.path))
         if should_require_admin(request.endpoint) and not is_admin():
@@ -48,5 +51,6 @@ def create_app():
         return jsonify({"ok": True})
 
     app.register_blueprint(bp)
+    app.register_blueprint(agent_api_bp)
 
     return app
