@@ -129,6 +129,9 @@ def should_require_login(endpoint):
 
 
 def should_require_admin(endpoint):
+    # Editors may inspect RSS articles, but all RSS mutations remain admin-only.
+    if endpoint == "main.edit_rss_article" and request.method in {"GET", "HEAD"}:
+        return False
     if endpoint in ADMIN_ONLY_ENDPOINTS:
         return True
     if not endpoint or not endpoint.startswith("main."):

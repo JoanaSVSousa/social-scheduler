@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="section-title">
+    <div>
+        <p class="eyebrow">{{ item.feed_name }}</p>
+        <h1>{{ item.title }}</h1>
+        <p>Read-only article · {{ source_type_label(item.content_type) }}</p>
+    </div>
+    <a class="button" href="{{ item.url }}" target="_blank" rel="noopener">Open source</a>
+</div>
+{% for post in posts %}
+<section class="source-panel">
+    <h2>{{ post.platform }} · {{ post.title }}</h2>
+    <small>Post {{ post.id }} · {{ post.status }}</small>
+    <p style="white-space: pre-wrap">{{ post.content }}</p>
+    <p>{{ post.hashtags or '' }}</p>
+</section>
+{% else %}
+<p>No post versions for this article.</p>
+{% endfor %}
+{% endblock %}

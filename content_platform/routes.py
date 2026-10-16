@@ -25,7 +25,7 @@ from .models import (
     truncate_content_for_platform,
 )
 from .security import validate_csrf
-from .auth import is_logged_in, login_required, verify_user_credentials
+from .auth import is_admin, is_logged_in, login_required, verify_user_credentials
 from .services.analytics import build_platform_counts, build_status_counts
 from .services.clock import app_now
 from .services.scheduled_view import list_scheduled_occurrences
@@ -723,6 +723,11 @@ def edit_rss_article(rss_item_id):
     item, posts = get_rss_group(rss_item_id)
     if item is None:
         abort(404)
+
+    if not is_admin():
+        return render_template(
+            "rss_article_read.html", item=item, posts=posts, read_only_view=True,
+        )
 
     if request.method == "POST":
         validate_csrf()
