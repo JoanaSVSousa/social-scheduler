@@ -2,7 +2,8 @@ name: RSS check
 
 on:
   schedule:
-    - cron: "0 * * * *"
+    # Daily at 07:17 UTC (07:17 winter / 08:17 summer in Lisbon).
+    - cron: "17 7 * * *"
   workflow_dispatch:
 
 jobs:
