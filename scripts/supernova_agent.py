@@ -13,7 +13,7 @@ class NoRedirects(HTTPRedirectHandler):
         return None
 
 
-def request_json(base, token, path, payload=None):
+def request_json(base, token, path, payload=None, method=None):
     parsed = urlsplit(base)
     if (parsed.scheme != 'https' and not (parsed.scheme == 'http' and parsed.hostname in {'localhost', '127.0.0.1', '::1'})) or parsed.username or parsed.password or parsed.query or parsed.fragment:
         raise ValueError('Use HTTPS (HTTP allowed only for local development), without credentials/query/fragment in the URL.')
@@ -21,7 +21,7 @@ def request_json(base, token, path, payload=None):
         raise ValueError('SUPERNOVA_AGENT_TOKEN is required.')
     request = Request(base.rstrip('/') + path, data=json.dumps(payload).encode() if payload is not None else None,
                       headers={'Authorization': 'Bearer ' + token, 'Accept': 'application/json',
-                               'Content-Type': 'application/json'}, method='PATCH' if payload is not None else 'GET')
+                               'Content-Type': 'application/json'}, method=method or ('PATCH' if payload is not None else 'GET'))
     with build_opener(NoRedirects).open(request, timeout=30) as response:
         return json.load(response)
 
@@ -43,6 +43,28 @@ def main():
             command.add_argument('--reason', required=True)
             command.add_argument('--expected-version', required=True)
             command.add_argument('--request-id', required=True)
+    create = commands.add_parser('create', help='Create a text post as a draft or schedule it.')
+    create.add_argument('--title', required=True)
+    create.add_argument('--copy', required=True)
+    create.add_argument('--platform', required=True)
+    create.add_argument('--hashtags', default='')
+    create.add_argument('--source-type', choices=['Regular', 'News'], default='Regular')
+    create.add_argument('--content-format')
+    create.add_argument('--scheduled-at')
+    create.add_argument('--request-id', required=True)
+    edit = commands.add_parser('edit', help='Edit an unpublished post.')
+    edit.add_argument('post_id', type=int)
+    edit.add_argument('--expected-version', required=True)
+    edit.add_argument('--request-id', required=True)
+    edit.add_argument('--title')
+    edit.add_argument('--copy')
+    edit.add_argument('--hashtags')
+    edit.add_argument('--scheduled-at')
+    publish = commands.add_parser('publish', help='Publish a post immediately.')
+    publish.add_argument('post_id', type=int)
+    publish.add_argument('--expected-version', required=True)
+    publish.add_argument('--request-id', required=True)
+    publish.add_argument('--reason', required=True)
     commands.add_parser('dashboard')
     commands.add_parser('scheduled')
     commands.add_parser('version')
@@ -64,6 +86,22 @@ def main():
             result['verification_matches'] = verified['version'] == result['version'] and verified['classification'] == result['classification']
             print(json.dumps(result, ensure_ascii=False, indent=2))
             return 0 if result['verification_matches'] else 2
+        elif args.command == 'create':
+            payload = {key: getattr(args, key) for key in ['title', 'copy', 'platform', 'hashtags', 'source_type',
+                                                               'content_format', 'scheduled_at'] if getattr(args, key) is not None}
+            payload['client_request_id'] = args.request_id
+            result = request_json(args.base_url, token, '/api/posts', payload, method='POST')
+        elif args.command == 'edit':
+            payload = {key: getattr(args, key) for key in ['title', 'copy', 'hashtags', 'scheduled_at']
+                       if getattr(args, key) is not None}
+            if not payload:
+                parser.error('edit requires at least one of --title, --copy, --hashtags, or --scheduled-at')
+            payload.update(expected_version=args.expected_version, client_request_id=args.request_id)
+            result = request_json(args.base_url, token, f'/api/posts/{args.post_id}', payload, method='PATCH')
+        elif args.command == 'publish':
+            payload = {'expected_version': args.expected_version, 'client_request_id': args.request_id,
+                       'reason': args.reason}
+            result = request_json(args.base_url, token, f'/api/posts/{args.post_id}/publish', payload, method='POST')
         else:
             result = call('/api/' + ('scheduled/occurrences' if args.command == 'scheduled' else args.command))
         print(json.dumps(result, ensure_ascii=False, indent=2))

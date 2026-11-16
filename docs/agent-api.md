@@ -16,10 +16,11 @@ Configurar no ambiente privado do servidor apenas hashes SHA-256 hexadecimais de
 
 - `SUPERNOVA_AGENT_READ_TOKEN_SHA256`: leitura.
 - `SUPERNOVA_AGENT_CLASSIFY_TOKEN_SHA256`: leitura e PATCH de classificação.
+- `SUPERNOVA_AGENT_MANAGE_TOKEN_SHA256`: leitura, classificação, criação/edição de posts e publicação imediata.
 
-Valores vazios/desconhecidos: 401 JSON. Token de leitura a tentar PATCH: 403. A credencial técnica não permite publicar, agendar, apagar, gerir integrações ou criar utilizadores. As sessões humanas existentes conservam as suas próprias permissões.
+Valores vazios/desconhecidos: 401 JSON. Token de leitura a tentar PATCH: 403. O token de classificação não pode publicar. O token de gestão pode criar posts de texto como rascunho/agendados, editar posts ainda não publicados e pedir publicação imediata em plataformas com publisher implementado. A edição da API altera o registo no Supernova; não altera uma publicação já feita na rede. Nenhum token de agente permite apagar posts, gerir integrações ou criar utilizadores. As sessões humanas existentes conservam as suas próprias permissões.
 
-Usar tokens distintos e aleatórios com pelo menos 32 bytes de entropia, guardar o token original num secret manager e fornecer ao processo agente por variável de ambiente. Não enviar por chat nem adicionar ao repositório. Revogação/rotação: remover/substituir o hash no servidor. Esta implementação mínima tem duas credenciais por capacidade, não um sistema de contas individuais; a auditoria identifica a credencial por uma impressão digital. Não foram geradas credenciais nesta tarefa.
+Usar tokens distintos e aleatórios com pelo menos 32 bytes de entropia, guardar o token original num secret manager e fornecer ao processo agente por variável de ambiente. Não adicionar tokens ao repositório. Revogação/rotação: remover/substituir o hash no servidor. Existem três níveis de credencial; a auditoria identifica a credencial por uma impressão digital.
 
 ## Contrato
 
@@ -32,6 +33,9 @@ OpenAPI: `docs/agent-api.openapi.json`.
 | GET `/api/posts/{id}` | Post, artigo RSS, media e ocorrências |
 | GET `/api/posts/{id}/verify` | Nova leitura do mesmo post para confirmação posterior |
 | PATCH `/api/posts/{id}/classification` | Apenas `source_type` e timestamp do post alvo, com auditoria |
+| POST `/api/posts` | Criar post de texto como rascunho ou agendado; requer token de gestão e `client_request_id` |
+| PATCH `/api/posts/{id}` | Editar título, copy, hashtags e agendamento de post não publicado; requer versão e `client_request_id` |
+| POST `/api/posts/{id}/publish` | Publicação imediata explícita; requer versão, `reason` e `client_request_id` |
 | GET `/api/dashboard` | Contagens com unidades explícitas |
 | GET `/api/scheduled/posts` | Posts distintos que têm ocorrências pendentes |
 | GET `/api/scheduled/occurrences` | Ocorrências pendentes com identificador explícito |
@@ -43,6 +47,21 @@ A antiga `/api/scheduled` continua a servir a vista HTML por sessão; os agentes
 Post: `id`, `title`, `status`, `classification`, `source_type`, `article_id`, `article_url`, `article_title`, `platform`, `content_format`, `copy`, `hashtags`, `media`, `scheduled_at`, `timezone`, `occurrences`, `created_at`, `updated_at`, `version`. Media inclui ID, nome original, tipo e public_url; o URL pode estar vazio para ficheiros locais. Datas são as datas reais guardadas; datas de agendamento sem offset usam APP_TIMEZONE (default Europe/Lisbon). Timestamps created/updated da BD são devolvidos sem conversão inventada.
 
 `article_id` é o ID interno de `rss_items`, NÃO o ID WordPress. Artigos manuais sem relação RSS têm campos de artigo nulos. A classificação operacional usa `source_type`: Regular = all_green, News = news. São etiquetas existentes, não prova de revisão editorial. Não é possível inferir se um Regular já foi revisto por um humano. `ambiguous` e `unclassified` são rejeitados: se a evidência for ambígua, o agente deve registar a dúvida fora do post e não alterar a classificação. A API não decide a regra editorial automaticamente.
+
+O token de gestão pode criar posts sem media (rascunho por omissão ou agendado se `scheduled_at` for dado). Exemplo de criação:
+
+```json
+{
+  "title": "Título interno",
+  "copy": "Texto para publicar",
+  "platform": "Bluesky",
+  "hashtags": "",
+  "source_type": "Regular",
+  "client_request_id": "UUID-da-operação"
+}
+```
+
+Editar só é permitido em posts Draft, Scheduled ou Failed; campos aceites: `title`, `copy`, `hashtags`, `scheduled_at`, mais `expected_version` e `client_request_id`. `scheduled_at` pode ser `null` para remover o agendamento. Publicar é uma operação externa e explícita, apenas para posts em Draft, Scheduled ou Failed e plataformas com publicação implementada. A operação muda temporariamente o estado para `Publishing`, usa o publisher existente e guarda um recibo idempotente; se o processo cair a meio, o mesmo pedido fica bloqueado em `publish_in_progress` para evitar duplicar uma publicação incerta. Posts que precisam de media não podem ser criados com media por esta API; edições de posts publicados nas redes também não são suportadas.
 
 PATCH obrigatório, sem campos adicionais:
 
@@ -84,9 +103,12 @@ Para correr o servidor com base descartável, usar o comando de `docs/scheduled.
 python3 scripts/supernova_agent.py --base-url http://127.0.0.1:5000 list --status draft
 python3 scripts/supernova_agent.py --base-url http://127.0.0.1:5000 get 123
 python3 scripts/supernova_agent.py --base-url http://127.0.0.1:5000 classify 123 --classification news --reason 'Motivo fundamentado' --expected-version '<version>' --request-id '<UUID>'
+python3 scripts/supernova_agent.py --base-url http://127.0.0.1:5000 create --title 'Título interno' --copy 'Texto' --platform Bluesky --request-id '<UUID>'
+python3 scripts/supernova_agent.py --base-url http://127.0.0.1:5000 edit 123 --copy 'Texto revisto' --expected-version '<version>' --request-id '<UUID>'
+python3 scripts/supernova_agent.py --base-url http://127.0.0.1:5000 publish 123 --expected-version '<version>' --reason 'Aprovado' --request-id '<UUID>'
 ```
 
-O CLI envia PATCH e depois GET verify; reporta se a versão/classificação actual ainda coincide com o recibo. Não faz retries nem resolve conflitos silenciosamente. Sem MCP nesta fase: API + CLI são suficientes para integração sem browser.
+O CLI envia PATCH e depois GET verify para classificações; gestão usa `client_request_id`, versão esperada e recibos para repetição segura. Não resolve conflitos silenciosamente. A API não disponibiliza upload de media: criar posts de formatos que exigem media é rejeitado. Sem MCP nesta fase: API + CLI são suficientes para integração sem browser.
 
 Validação em 22/09/2026: 21 testes Python (incluindo 4 testes de integração em Postgres 16 descartável) e 9 testes JavaScript passaram. Postgres validou migração idempotente, RLS na nova tabela, leitura, concorrência entre operações distintas, retry simultâneo, conflitos e rollback de classificação quando a auditoria falha. Nenhum dado de produção foi usado. A tabela agent_operations activa RLS e revoga acessos PUBLIC/anon/authenticated quando esses papéis existem, mantendo acesso pelo proprietário da tabela. Antes de executar lotes, configurar credenciais por canal privado e confirmar a regra editorial. Não são necessárias permissões de publicação para classificar.
 

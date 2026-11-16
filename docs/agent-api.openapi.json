@@ -3,7 +3,7 @@
   "info": {
     "title": "Supernova Agent API",
     "version": "1.0.0",
-    "description": "Local implementation. Article IDs are internal RSS IDs; revision strings are opaque. See agent-api.md for full semantics."
+    "description": "Agent API for reading, classification, post management, and explicit publication. POST/PATCH content operations require a management token. See agent-api.md for full semantics."
   },
   "servers": [
     {
@@ -259,6 +259,33 @@
             }
           }
         ]
+      },
+      "post": {
+        "summary": "Create a draft or scheduled text post (management token)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePostRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "403": {
+            "description": "Management capability required"
+          },
+          "409": {
+            "description": "Idempotency conflict"
+          }
+        }
       }
     },
     "/api/posts/{post_id}": {
@@ -362,6 +389,43 @@
             }
           }
         ]
+      },
+      "patch": {
+        "summary": "Edit an unpublished post (management token)",
+        "parameters": [
+          {
+            "name": "post_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditPostRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "403": {
+            "description": "Management capability required"
+          },
+          "409": {
+            "description": "Version or idempotency conflict"
+          }
+        }
       }
     },
     "/api/posts/{post_id}/verify": {
@@ -852,6 +916,48 @@
           }
         }
       }
+    },
+    "/api/posts/{post_id}/publish": {
+      "post": {
+        "summary": "Publish a post immediately (management token)",
+        "parameters": [
+          {
+            "name": "post_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishPostRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Published"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "403": {
+            "description": "Management capability required"
+          },
+          "409": {
+            "description": "Version conflict, unsupported platform, or publish in progress"
+          },
+          "502": {
+            "description": "Publisher returned a failure"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1046,6 +1152,113 @@
           },
           "post": {
             "$ref": "#/components/schemas/Post"
+          }
+        }
+      },
+      "CreatePostRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "copy",
+          "platform",
+          "client_request_id"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "copy": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string"
+          },
+          "hashtags": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "source_type": {
+            "type": "string",
+            "enum": [
+              "Regular",
+              "News"
+            ]
+          },
+          "content_format": {
+            "type": "string"
+          },
+          "scheduled_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "client_request_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      },
+      "EditPostRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expected_version",
+          "client_request_id"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "copy": {
+            "type": "string"
+          },
+          "hashtags": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "scheduled_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "expected_version": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64
+          },
+          "client_request_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      },
+      "PublishPostRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expected_version",
+          "client_request_id",
+          "reason"
+        ],
+        "properties": {
+          "expected_version": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64
+          },
+          "client_request_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
           }
         }
       }

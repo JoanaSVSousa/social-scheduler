@@ -16,10 +16,12 @@ class AgentApiTests(unittest.TestCase):
         env = patch.dict(os.environ, {
             'SUPERNOVA_AGENT_READ_TOKEN_SHA256': hashlib.sha256(b'read-test').hexdigest(),
             'SUPERNOVA_AGENT_CLASSIFY_TOKEN_SHA256': hashlib.sha256(b'write-test').hexdigest(),
+            'SUPERNOVA_AGENT_MANAGE_TOKEN_SHA256': hashlib.sha256(b'manage-test').hexdigest(),
         })
         env.start()
         self.addCleanup(env.stop)
         self.headers = {'Authorization': 'Bearer write-test'}
+        self.manage_headers = {'Authorization': 'Bearer manage-test'}
         self.post_id = self.post('Agent test', 'Draft')
 
     def detail(self, post_id=None):
@@ -44,6 +46,51 @@ class AgentApiTests(unittest.TestCase):
                          headers={'Authorization': 'Bearer read-test'}).status_code, 403)
         anonymous = self.app.test_client()
         self.assertEqual(anonymous.post(f'/posts/{self.post_id}/publish-now', headers=self.headers).status_code, 302)
+
+    def test_manage_token_creates_and_edits_posts_with_idempotency(self):
+        payload = {
+            'title': 'Agent generated', 'copy': 'A useful update', 'platform': 'Bluesky',
+            'client_request_id': 'create-1',
+        }
+        self.assertEqual(self.client.post('/api/posts', json=payload, headers=self.headers).status_code, 403)
+        created = self.client.post('/api/posts', json=payload, headers=self.manage_headers)
+        self.assertEqual(created.status_code, 201)
+        post = created.json['post']
+        self.assertEqual(post['status'], 'draft')
+        self.assertEqual(post['copy'], 'A useful update')
+        retried = self.client.post('/api/posts', json=payload, headers=self.manage_headers)
+        self.assertEqual(retried.status_code, 200)
+        self.assertTrue(retried.json['already_applied'])
+        self.assertEqual(retried.json['post']['id'], post['id'])
+
+        edit_payload = {
+            'copy': 'Updated before publication', 'expected_version': post['version'],
+            'client_request_id': 'edit-1',
+        }
+        self.assertEqual(self.client.patch(f'/api/posts/{post["id"]}', json=edit_payload, headers=self.headers).status_code, 403)
+        edited = self.client.patch(f'/api/posts/{post["id"]}', json=edit_payload, headers=self.manage_headers)
+        self.assertEqual(edited.status_code, 200)
+        self.assertEqual(edited.json['post']['copy'], 'Updated before publication')
+        replay = self.client.patch(f'/api/posts/{post["id"]}', json=edit_payload, headers=self.manage_headers)
+        self.assertTrue(replay.json['already_applied'])
+
+    def test_manage_token_can_publish_once_and_replay_receipt(self):
+        post_id = self.post('Publish through API', 'Draft')
+        current = self.detail(post_id)
+        payload = {'expected_version': current['version'], 'client_request_id': 'publish-1', 'reason': 'Approved by agent'}
+
+        def publish_and_mark(identifier):
+            with get_connection() as conn:
+                conn.execute("UPDATE posts SET status='Published', updated_at=CURRENT_TIMESTAMP WHERE id=?", (identifier,))
+            return {'ok': True, 'message': 'synthetic external id'}
+
+        with patch('content_platform.agent_api.publish_post_now', side_effect=publish_and_mark) as publish:
+            response = self.client.post(f'/api/posts/{post_id}/publish', json=payload, headers=self.manage_headers)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json['post']['status'], 'published')
+            replay = self.client.post(f'/api/posts/{post_id}/publish', json=payload, headers=self.manage_headers)
+            self.assertTrue(replay.json['already_applied'])
+            self.assertEqual(publish.call_count, 1)
 
     def test_listing_filters_links_pagination(self):
         with get_connection() as conn:

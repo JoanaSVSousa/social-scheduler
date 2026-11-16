@@ -3,13 +3,20 @@ import hashlib
 import hmac
 import json
 import os
+from datetime import datetime
 from uuid import uuid4
 
 from flask import Blueprint, current_app, g, jsonify, request
 from werkzeug.exceptions import HTTPException
 
 from .database import get_connection
+from .models import (
+    FORMAT_MEDIA_RULES, PLATFORM_CONTENT_FORMATS, PLATFORM_CONTENT_LIMITS,
+    PLATFORMS, Post, default_content_format,
+)
 from .services.clock import app_now
+from .services.publisher import publish_post_now
+from .services.scheduler import add_log
 from .services.scheduled_view import list_scheduled_occurrences
 
 bp = Blueprint('agent_api', __name__, url_prefix='/api')
@@ -29,18 +36,23 @@ def authenticate():
         raise ApiError('unauthorized', 401)
     digest = hashlib.sha256(authorization[7:].encode()).hexdigest()
     g.can_classify = False
+    g.can_manage_posts = False
     matched = False
-    for variable, writable in [('SUPERNOVA_AGENT_READ_TOKEN_SHA256', False),
-                                ('SUPERNOVA_AGENT_CLASSIFY_TOKEN_SHA256', True)]:
+    for variable, capability in [
+        ('SUPERNOVA_AGENT_READ_TOKEN_SHA256', 'read'),
+        ('SUPERNOVA_AGENT_CLASSIFY_TOKEN_SHA256', 'classify'),
+        ('SUPERNOVA_AGENT_MANAGE_TOKEN_SHA256', 'manage'),
+    ]:
         configured = os.environ.get(variable, '')
         if len(configured) == 64 and hmac.compare_digest(digest, configured):
             matched = True
-            g.can_classify = g.can_classify or writable
+            g.can_classify = g.can_classify or capability in {'classify', 'manage'}
+            g.can_manage_posts = g.can_manage_posts or capability == 'manage'
     if not matched:
         raise ApiError('unauthorized', 401)
     # Stable audit identity without storing a usable credential.
     g.agent_id = 'agent-' + digest[:16]
-    if request.method not in {'GET', 'HEAD', 'OPTIONS'} and not g.can_classify:
+    if request.method not in {'GET', 'HEAD', 'OPTIONS'} and not (g.can_classify or g.can_manage_posts):
         raise ApiError('forbidden', 403)
 
 
@@ -112,8 +124,10 @@ def integer_arg(name, default, maximum=None):
 @bp.get('/version')
 def api_version():
     return jsonify(api_version='1', revision=os.environ.get('RENDER_GIT_COMMIT', 'local'),
-                   capabilities=['read_posts', 'read_scheduled', 'classify_posts'] if g.can_classify
-                   else ['read_posts', 'read_scheduled'])
+                   capabilities=(['read_posts', 'read_scheduled', 'classify_posts', 'manage_posts', 'publish_posts']
+                                 if g.can_manage_posts else
+                                 ['read_posts', 'read_scheduled', 'classify_posts'] if g.can_classify else
+                                 ['read_posts', 'read_scheduled']))
 
 
 @bp.get('/posts')
@@ -156,6 +170,8 @@ def post_detail(post_id):
 
 @bp.patch('/posts/<int:post_id>/classification')
 def classify(post_id):
+    if not g.can_classify:
+        raise ApiError('forbidden', 403)
     if request.content_length and request.content_length > 8192:
         raise ApiError('payload_too_large', 413)
     body = request.get_json(silent=True)
@@ -206,6 +222,237 @@ def classify(post_id):
         conn.execute('INSERT INTO logs (post_id, level, message) VALUES (?, ?, ?)',
                      (post_id, 'INFO', f'Agent classification operation {operation_id}: {before} -> {updated["classification"]}'))
     return jsonify(**response, already_applied=False)
+
+
+def _require_manage():
+    if not g.can_manage_posts:
+        raise ApiError('forbidden', 403)
+
+
+def _operation_lock(conn, client_request_id):
+    if conn.dialect == 'sqlite':
+        conn.execute('BEGIN IMMEDIATE')
+    elif conn.dialect == 'postgres':
+        key = int.from_bytes(hashlib.sha256((g.agent_id + ':' + client_request_id).encode()).digest()[:8], 'big', signed=True)
+        conn.execute('SELECT pg_advisory_xact_lock(?)', (key,))
+
+
+def _existing_operation(conn, client_request_id, fingerprint):
+    previous = conn.execute('SELECT request_hash, response_json FROM agent_operations WHERE agent_id = ? AND client_request_id = ?',
+                            (g.agent_id, client_request_id)).fetchone()
+    if not previous:
+        return None
+    if previous['request_hash'] != fingerprint:
+        raise ApiError('idempotency_conflict', 409)
+    return json.loads(previous['response_json'])
+
+
+def _validate_post_content(payload, *, creating):
+    allowed = {'title', 'copy', 'hashtags', 'source_type', 'platform', 'content_format', 'scheduled_at'}
+    required = {'title', 'copy', 'platform'} if creating else set()
+    if not isinstance(payload, dict) or set(payload) - allowed or not required.issubset(payload):
+        raise ApiError('invalid_payload', 400)
+    if creating:
+        for key in ('title', 'copy', 'platform', 'hashtags', 'source_type', 'content_format'):
+            if key in payload and not isinstance(payload[key], str):
+                raise ApiError('invalid_payload', 400)
+        if 'scheduled_at' in payload and payload['scheduled_at'] is not None and not isinstance(payload['scheduled_at'], str):
+            raise ApiError('invalid_payload', 400)
+    for key in payload:
+        if key == 'scheduled_at' and payload[key] is None:
+            continue
+        if not isinstance(payload[key], str):
+            raise ApiError('invalid_payload', 400)
+    if creating:
+        platform = payload['platform']
+        title = payload['title'].strip()
+        copy = payload['copy'].strip()
+        hashtags = payload.get('hashtags', '').strip()
+        source_type = payload.get('source_type', 'Regular')
+        content_format = payload.get('content_format') or default_content_format(platform)
+        scheduled_at = payload.get('scheduled_at')
+    else:
+        platform = None
+        title = payload.get('title')
+        copy = payload.get('copy')
+        hashtags = payload.get('hashtags')
+        source_type = payload.get('source_type')
+        content_format = payload.get('content_format')
+        scheduled_at = payload.get('scheduled_at')
+    if creating and platform not in PLATFORMS:
+        raise ApiError('invalid_platform', 400)
+    if creating and (not title or len(title) > 120 or not copy):
+        raise ApiError('invalid_content', 400)
+    if creating and (source_type not in {'Regular', 'News'} or content_format not in PLATFORM_CONTENT_FORMATS.get(platform, [])):
+        raise ApiError('invalid_content_format', 400)
+    if creating and FORMAT_MEDIA_RULES.get(content_format, {}).get('media_required'):
+        raise ApiError('media_upload_not_supported', 400)
+    if creating and len(hashtags) > 400:
+        raise ApiError('invalid_hashtags', 400)
+    if creating and len(copy) + (len(hashtags) + 2 if hashtags else 0) > PLATFORM_CONTENT_LIMITS.get(platform, 2200):
+        raise ApiError('content_too_long', 400)
+    if scheduled_at:
+        try:
+            parsed = datetime.fromisoformat(scheduled_at.replace('Z', '+00:00'))
+        except ValueError as exc:
+            raise ApiError('invalid_scheduled_at', 400) from exc
+        local_now = app_now()
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=local_now.tzinfo)
+        if parsed <= local_now:
+            raise ApiError('scheduled_at_must_be_future', 400)
+        scheduled_at = parsed.astimezone(local_now.tzinfo).replace(tzinfo=None).isoformat(timespec='minutes')
+    return {
+        'title': title, 'copy': copy, 'hashtags': hashtags, 'source_type': source_type,
+        'content_format': content_format, 'scheduled_at': scheduled_at,
+    }
+
+
+@bp.post('/posts')
+def create_agent_post():
+    _require_manage()
+    payload = request.get_json(silent=True)
+    if request.content_length and request.content_length > 16384:
+        raise ApiError('payload_too_large', 413)
+    if not isinstance(payload, dict) or not isinstance(payload.get('client_request_id'), str) or not 1 <= len(payload['client_request_id']) <= 128:
+        raise ApiError('invalid_payload', 400)
+    if set(payload) - {'title', 'copy', 'hashtags', 'source_type', 'platform', 'content_format', 'scheduled_at', 'client_request_id'}:
+        raise ApiError('invalid_payload', 400)
+    post_fields = _validate_post_content({key: value for key, value in payload.items() if key != 'client_request_id'}, creating=True)
+    request_hash = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+    status = 'Scheduled' if post_fields['scheduled_at'] else 'Draft'
+    with get_connection() as conn:
+        _operation_lock(conn, payload['client_request_id'])
+        previous = _existing_operation(conn, payload['client_request_id'], request_hash)
+        if previous:
+            return jsonify({**previous, 'already_applied': True})
+        post = Post(title=post_fields['title'], content=post_fields['copy'], hashtags=post_fields['hashtags'],
+                    platform=payload['platform'], content_format=post_fields['content_format'],
+                    scheduled_at=post_fields['scheduled_at'], status=status, source_type=post_fields['source_type'])
+        from .database import insert_and_get_id
+        post_id = insert_and_get_id(conn, '''INSERT INTO posts
+            (title, content, hashtags, platform, content_format, rss_item_id, source_type, scheduled_at, status)
+            VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?)''',
+            (post.title, post.content, post.hashtags, post.platform, post.content_format,
+             post.source_type, post.scheduled_at, post.status))
+        created = read_post(conn, post_id)
+        response = {'ok': True, 'post': serialize(conn, created), 'already_applied': False}
+        operation_id = str(uuid4())
+        conn.execute('''INSERT INTO agent_operations
+            (operation_id, agent_id, client_request_id, request_hash, post_id, reason, response_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?)''',
+            (operation_id, g.agent_id, payload['client_request_id'], request_hash, post_id,
+             'Agent created post', json.dumps(response)))
+        conn.execute('INSERT INTO logs (post_id, level, message) VALUES (?, ?, ?)',
+                     (post_id, 'INFO', f'Agent created post ({operation_id}).'))
+    return jsonify(**response), 201
+
+
+@bp.patch('/posts/<int:post_id>')
+def update_agent_post(post_id):
+    _require_manage()
+    payload = request.get_json(silent=True)
+    required = {'expected_version', 'client_request_id'}
+    editable = {'title', 'copy', 'hashtags', 'scheduled_at'}
+    if request.content_length and request.content_length > 16384:
+        raise ApiError('payload_too_large', 413)
+    if (not isinstance(payload, dict) or not required.issubset(payload)
+            or set(payload) - required - editable
+            or not editable.intersection(payload)
+            or not isinstance(payload['expected_version'], str)
+            or len(payload['expected_version']) != 64
+            or not isinstance(payload['client_request_id'], str)
+            or not 1 <= len(payload['client_request_id']) <= 128):
+        raise ApiError('invalid_payload', 400)
+    for key, value in payload.items():
+        if key not in {'scheduled_at'} or value is not None:
+            if not isinstance(value, str):
+                raise ApiError('invalid_payload', 400)
+    request_hash = hashlib.sha256(json.dumps({'post_id': post_id, **payload}, sort_keys=True).encode()).hexdigest()
+    with get_connection() as conn:
+        _operation_lock(conn, payload['client_request_id'])
+        previous = _existing_operation(conn, payload['client_request_id'], request_hash)
+        if previous:
+            return jsonify({**previous, 'already_applied': True})
+        post = read_post(conn, post_id, lock=True)
+        if version(post) != payload['expected_version']:
+            raise ApiError('version_conflict', 409)
+        if post['status'] not in {'Draft', 'Scheduled', 'Failed'}:
+            raise ApiError('post_not_editable', 409)
+        updates = {}
+        for field in editable.intersection(payload):
+            updates[field] = payload[field]
+        title = updates.get('title', post['title']).strip()
+        copy = updates.get('copy', post['content']).strip()
+        hashtags = updates.get('hashtags', post['hashtags'] or '').strip()
+        scheduled_at = updates.get('scheduled_at', post['scheduled_at'])
+        if not title or len(title) > 120 or not copy or len(hashtags) > 400:
+            raise ApiError('invalid_content', 400)
+        if len(copy) + (len(hashtags) + 2 if hashtags else 0) > PLATFORM_CONTENT_LIMITS.get(post['platform'], 2200):
+            raise ApiError('content_too_long', 400)
+        if scheduled_at:
+            normalized = _validate_post_content({'scheduled_at': scheduled_at}, creating=False)['scheduled_at']
+            scheduled_at = normalized
+        next_status = 'Scheduled' if scheduled_at else 'Draft'
+        conn.execute('''UPDATE posts SET title=?, content=?, hashtags=?, scheduled_at=?, status=?, updated_at=CURRENT_TIMESTAMP
+                        WHERE id=?''', (title, copy, hashtags, scheduled_at, next_status, post_id))
+        updated = serialize(conn, read_post(conn, post_id))
+        response = {'ok': True, 'post': updated, 'already_applied': False}
+        operation_id = str(uuid4())
+        conn.execute('''INSERT INTO agent_operations
+            (operation_id, agent_id, client_request_id, request_hash, post_id, reason, response_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?)''',
+            (operation_id, g.agent_id, payload['client_request_id'], request_hash, post_id,
+             'Agent edited post', json.dumps(response)))
+        conn.execute('INSERT INTO logs (post_id, level, message) VALUES (?, ?, ?)',
+                     (post_id, 'INFO', f'Agent edited post ({operation_id}).'))
+    return jsonify(**response)
+
+
+@bp.post('/posts/<int:post_id>/publish')
+def publish_agent_post(post_id):
+    _require_manage()
+    payload = request.get_json(silent=True)
+    required = {'expected_version', 'client_request_id', 'reason'}
+    if not isinstance(payload, dict) or set(payload) != required or any(not isinstance(payload[k], str) for k in required):
+        raise ApiError('invalid_payload', 400)
+    if (len(payload['expected_version']) != 64 or not 1 <= len(payload['client_request_id']) <= 128
+            or not 1 <= len(payload['reason'].strip()) <= 1000):
+        raise ApiError('invalid_payload', 400)
+    request_hash = hashlib.sha256(json.dumps({'post_id': post_id, **payload}, sort_keys=True).encode()).hexdigest()
+    operation_id = str(uuid4())
+    with get_connection() as conn:
+        _operation_lock(conn, payload['client_request_id'])
+        previous = _existing_operation(conn, payload['client_request_id'], request_hash)
+        if previous:
+            if previous.get('pending'):
+                raise ApiError('publish_in_progress', 409)
+            return jsonify({**previous, 'already_applied': True})
+        post = read_post(conn, post_id, lock=True)
+        if version(post) != payload['expected_version']:
+            raise ApiError('version_conflict', 409)
+        if post['status'] not in {'Draft', 'Scheduled', 'Failed'}:
+            raise ApiError('post_not_publishable', 409)
+        from .services.platform_publishers import is_platform_publishable
+        if not is_platform_publishable(post['platform']):
+            raise ApiError('platform_publish_not_implemented', 409)
+        conn.execute("UPDATE posts SET status='Publishing', updated_at=CURRENT_TIMESTAMP WHERE id=?", (post_id,))
+        response = {'ok': False, 'pending': True, 'operation_id': operation_id, 'post_id': post_id}
+        conn.execute('''INSERT INTO agent_operations
+            (operation_id, agent_id, client_request_id, request_hash, post_id, reason, response_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?)''',
+            (operation_id, g.agent_id, payload['client_request_id'], request_hash, post_id,
+             payload['reason'].strip(), json.dumps(response)))
+        conn.execute('INSERT INTO logs (post_id, level, message) VALUES (?, ?, ?)',
+                     (post_id, 'INFO', f'Agent requested publication ({operation_id}): {payload["reason"].strip()}'))
+    result = publish_post_now(post_id)
+    with get_connection() as conn:
+        final_post = serialize(conn, read_post(conn, post_id))
+        response = {'ok': result['ok'], 'operation_id': operation_id, 'post_id': post_id,
+                    'message': result.get('message', ''), 'post': final_post, 'already_applied': False}
+        conn.execute('UPDATE agent_operations SET response_json=? WHERE operation_id=?',
+                     (json.dumps(response), operation_id))
+    return jsonify(**response), (200 if result['ok'] else 502)
 
 
 @bp.get('/dashboard')
