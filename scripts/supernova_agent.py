@@ -60,6 +60,10 @@ def main():
     edit.add_argument('--copy')
     edit.add_argument('--hashtags')
     edit.add_argument('--scheduled-at')
+    delete_post = commands.add_parser('delete-post', help='Delete one standalone post from Supernova.')
+    delete_post.add_argument('post_id', type=int)
+    delete_post.add_argument('--expected-version', required=True)
+    delete_post.add_argument('--reason', required=True)
     publish = commands.add_parser('publish', help='Publish a post immediately.')
     publish.add_argument('post_id', type=int)
     publish.add_argument('--expected-version', required=True)
@@ -107,6 +111,9 @@ def main():
             payload = {'expected_version': args.expected_version, 'client_request_id': args.request_id,
                        'reason': args.reason}
             result = request_json(args.base_url, token, f'/api/posts/{args.post_id}/publish', payload, method='POST')
+        elif args.command == 'delete-post':
+            payload = {'expected_version': args.expected_version, 'reason': args.reason}
+            result = request_json(args.base_url, token, f'/api/posts/{args.post_id}', payload, method='DELETE')
         elif args.command == 'delete-article':
             payload = {'expected_title': args.expected_title, 'expected_url': args.expected_url,
                        'reason': args.reason}

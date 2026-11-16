@@ -426,6 +426,46 @@
             "description": "Version or idempotency conflict"
           }
         }
+      },
+      "delete": {
+        "summary": "Delete a standalone Supernova post (management token)",
+        "parameters": [
+          {
+            "name": "post_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeletePostRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Deleted from Supernova"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "403": {
+            "description": "Management capability required"
+          },
+          "404": {
+            "description": "Post not found"
+          },
+          "409": {
+            "description": "Version conflict or post belongs to an RSS group"
+          }
+        }
       }
     },
     "/api/posts/{post_id}/verify": {
@@ -1364,6 +1404,26 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 2048
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        }
+      },
+      "DeletePostRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expected_version",
+          "reason"
+        ],
+        "properties": {
+          "expected_version": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64
           },
           "reason": {
             "type": "string",

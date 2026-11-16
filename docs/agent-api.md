@@ -36,6 +36,7 @@ OpenAPI: `docs/agent-api.openapi.json`.
 | POST `/api/posts` | Criar post de texto como rascunho ou agendado; requer token de gestão e `client_request_id` |
 | PATCH `/api/posts/{id}` | Editar título, copy, hashtags e agendamento de post não publicado; requer versão e `client_request_id` |
 | POST `/api/posts/{id}/publish` | Publicação imediata explícita; requer versão, `reason` e `client_request_id` |
+| DELETE `/api/posts/{id}` | Eliminar um post sem ligação RSS; requer versão e `reason` |
 | POST `/api/rss/articles/{id}/delete` (ou DELETE `/api/rss/articles/{id}`) | Eliminar um artigo RSS e as versões associadas no Supernova; requer `expected_title`, `expected_url` e `reason` |
 | GET `/api/dashboard` | Contagens com unidades explícitas |
 | GET `/api/scheduled/posts` | Posts distintos que têm ocorrências pendentes |
@@ -63,6 +64,8 @@ O token de gestão pode criar posts sem media (rascunho por omissão ou agendado
 ```
 
 Editar só é permitido em posts Draft, Scheduled ou Failed; campos aceites: `title`, `copy`, `hashtags`, `scheduled_at`, mais `expected_version` e `client_request_id`. `scheduled_at` pode ser `null` para remover o agendamento. Publicar é uma operação externa e explícita, apenas para posts em Draft, Scheduled ou Failed e plataformas com publicação implementada. A operação muda temporariamente o estado para `Publishing`, usa o publisher existente e guarda um recibo idempotente; se o processo cair a meio, o mesmo pedido fica bloqueado em `publish_in_progress` para evitar duplicar uma publicação incerta. Posts que precisam de media não podem ser criados com media por esta API; edições de posts publicados nas redes também não são suportadas.
+
+`DELETE /api/posts/{id}` só remove posts sem ligação RSS e requer `expected_version` e `reason`. Se o post pertencer a um artigo RSS, recebe 409 `rss_group_required` e deve usar a eliminação do grupo. Ambas as formas removem registos do Supernova, não publicações externas.
 
 Eliminar um artigo RSS requer o título e URL exactos lidos anteriormente; é uma chamada por artigo, sem eliminação em lote:
 
@@ -119,6 +122,7 @@ python3 scripts/supernova_agent.py --base-url http://127.0.0.1:5000 classify 123
 python3 scripts/supernova_agent.py --base-url http://127.0.0.1:5000 create --title 'Título interno' --copy 'Texto' --platform Bluesky --request-id '<UUID>'
 python3 scripts/supernova_agent.py --base-url http://127.0.0.1:5000 edit 123 --copy 'Texto revisto' --expected-version '<version>' --request-id '<UUID>'
 python3 scripts/supernova_agent.py --base-url http://127.0.0.1:5000 publish 123 --expected-version '<version>' --reason 'Aprovado' --request-id '<UUID>'
+python3 scripts/supernova_agent.py --base-url http://127.0.0.1:5000 delete-post 123 --expected-version '<version>' --reason 'Rascunho obsoleto'
 python3 scripts/supernova_agent.py --base-url http://127.0.0.1:5000 delete-article 123 --expected-title 'Título exacto' --expected-url 'https://example.test/article' --reason 'Duplicado'
 ```
 

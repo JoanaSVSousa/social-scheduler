@@ -114,6 +114,33 @@ class AgentApiTests(unittest.TestCase):
         self.assertEqual(self.client.get(f'/api/posts/{self.post_id}', headers=self.manage_headers).status_code, 404)
         self.assertEqual(self.client.post(f'/api/rss/articles/{article_id}/delete', json=body, headers=self.manage_headers).status_code, 404)
 
+    def test_manage_token_deletes_standalone_post_with_expected_version(self):
+        post_id = self.post('Standalone delete', 'Draft')
+        version_before = self.detail(post_id)['version']
+        body = {'expected_version': version_before, 'reason': 'Obsolete draft'}
+        self.assertEqual(self.client.delete(f'/api/posts/{post_id}', json=body, headers=self.headers).status_code, 403)
+        stale = self.client.delete(f'/api/posts/{post_id}', json={**body, 'expected_version': '0' * 64}, headers=self.manage_headers)
+        self.assertEqual(stale.status_code, 409)
+        deleted = self.client.delete(f'/api/posts/{post_id}', json=body, headers=self.manage_headers)
+        self.assertEqual(deleted.status_code, 200)
+        self.assertTrue(deleted.json['deleted'])
+        self.assertEqual(self.client.get(f'/api/posts/{post_id}', headers=self.manage_headers).status_code, 404)
+
+        rss_post = self.post('RSS member', 'Draft')
+        with get_connection() as conn:
+            feed_id = conn.execute(
+                "INSERT INTO rss_feeds (name,url,target_platforms) VALUES ('rss-member-test','https://example.test/rss-member','Bluesky')"
+            ).lastrowid
+            article_id = conn.execute(
+                "INSERT INTO rss_items (feed_id,item_guid,title,url) VALUES (?, 'rss-member-1', 'RSS title', 'https://example.test/rss-member/article')",
+                (feed_id,),
+            ).lastrowid
+            conn.execute('UPDATE posts SET rss_item_id=? WHERE id=?', (article_id, rss_post))
+        rss_version = self.detail(rss_post)['version']
+        blocked = self.client.delete(f'/api/posts/{rss_post}', json={'expected_version': rss_version, 'reason': 'Remove one'}, headers=self.manage_headers)
+        self.assertEqual(blocked.status_code, 409)
+        self.assertEqual(blocked.json['error'], 'rss_group_required')
+
     def test_listing_filters_links_pagination(self):
         with get_connection() as conn:
             feed = conn.execute("INSERT INTO rss_feeds (name,url,target_platforms) VALUES ('f','https://example.test/feed','Facebook')").lastrowid

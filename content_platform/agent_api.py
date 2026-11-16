@@ -410,6 +410,29 @@ def update_agent_post(post_id):
     return jsonify(**response)
 
 
+@bp.delete('/posts/<int:post_id>')
+def delete_agent_post(post_id):
+    _require_manage()
+    payload = request.get_json(silent=True)
+    if (not isinstance(payload, dict) or set(payload) != {'expected_version', 'reason'}
+            or not isinstance(payload['expected_version'], str) or len(payload['expected_version']) != 64
+            or not isinstance(payload['reason'], str) or not 1 <= len(payload['reason'].strip()) <= 1000):
+        raise ApiError('invalid_payload', 400)
+    with get_connection() as conn:
+        if conn.dialect == 'sqlite':
+            conn.execute('BEGIN IMMEDIATE')
+        post = read_post(conn, post_id, lock=True)
+        if post['rss_item_id'] is not None:
+            raise ApiError('rss_group_required', 409)
+        if version(post) != payload['expected_version']:
+            raise ApiError('version_conflict', 409)
+        conn.execute('DELETE FROM posts WHERE id=?', (post_id,))
+        conn.execute('INSERT INTO logs (post_id, level, message) VALUES (NULL, ?, ?)',
+                     ('INFO', f'Agent {g.agent_id} deleted standalone post #{post_id}: {payload["reason"].strip()}'))
+    return jsonify(ok=True, post_id=post_id, deleted=True,
+                   note='Deleted from Supernova only; external social publications are unchanged.')
+
+
 @bp.post('/posts/<int:post_id>/publish')
 def publish_agent_post(post_id):
     _require_manage()
