@@ -65,6 +65,11 @@ def main():
     publish.add_argument('--expected-version', required=True)
     publish.add_argument('--request-id', required=True)
     publish.add_argument('--reason', required=True)
+    delete_article = commands.add_parser('delete-article', help='Delete one RSS article and its Supernova network versions.')
+    delete_article.add_argument('article_id', type=int)
+    delete_article.add_argument('--expected-title', required=True)
+    delete_article.add_argument('--expected-url', required=True)
+    delete_article.add_argument('--reason', required=True)
     commands.add_parser('dashboard')
     commands.add_parser('scheduled')
     commands.add_parser('version')
@@ -102,6 +107,10 @@ def main():
             payload = {'expected_version': args.expected_version, 'client_request_id': args.request_id,
                        'reason': args.reason}
             result = request_json(args.base_url, token, f'/api/posts/{args.post_id}/publish', payload, method='POST')
+        elif args.command == 'delete-article':
+            payload = {'expected_title': args.expected_title, 'expected_url': args.expected_url,
+                       'reason': args.reason}
+            result = request_json(args.base_url, token, f'/api/rss/articles/{args.article_id}', payload, method='DELETE')
         else:
             result = call('/api/' + ('scheduled/occurrences' if args.command == 'scheduled' else args.command))
         print(json.dumps(result, ensure_ascii=False, indent=2))

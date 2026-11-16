@@ -958,6 +958,48 @@
           }
         }
       }
+    },
+    "/api/rss/articles/{article_id}": {
+      "delete": {
+        "summary": "Delete one RSS article and its Supernova network versions (management token)",
+        "parameters": [
+          {
+            "name": "article_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteArticleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Deleted from Supernova"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "403": {
+            "description": "Management capability required"
+          },
+          "404": {
+            "description": "Article not found"
+          },
+          "409": {
+            "description": "Expected title or URL did not match"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1254,6 +1296,32 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 128
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        }
+      },
+      "DeleteArticleRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expected_title",
+          "expected_url",
+          "reason"
+        ],
+        "properties": {
+          "expected_title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "expected_url": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
           },
           "reason": {
             "type": "string",

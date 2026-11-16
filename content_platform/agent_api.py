@@ -16,6 +16,7 @@ from .models import (
 )
 from .services.clock import app_now
 from .services.publisher import publish_post_now
+from .services.rss_groups import delete_rss_group
 from .services.scheduler import add_log
 from .services.scheduled_view import list_scheduled_occurrences
 
@@ -124,7 +125,7 @@ def integer_arg(name, default, maximum=None):
 @bp.get('/version')
 def api_version():
     return jsonify(api_version='1', revision=os.environ.get('RENDER_GIT_COMMIT', 'local'),
-                   capabilities=(['read_posts', 'read_scheduled', 'classify_posts', 'manage_posts', 'publish_posts']
+                   capabilities=(['read_posts', 'read_scheduled', 'classify_posts', 'manage_posts', 'publish_posts', 'delete_rss_articles']
                                  if g.can_manage_posts else
                                  ['read_posts', 'read_scheduled', 'classify_posts'] if g.can_classify else
                                  ['read_posts', 'read_scheduled']))
@@ -453,6 +454,30 @@ def publish_agent_post(post_id):
         conn.execute('UPDATE agent_operations SET response_json=? WHERE operation_id=?',
                      (json.dumps(response), operation_id))
     return jsonify(**response), (200 if result['ok'] else 502)
+
+
+@bp.delete('/rss/articles/<int:article_id>')
+def delete_agent_rss_article(article_id):
+    _require_manage()
+    payload = request.get_json(silent=True)
+    required = {'expected_title', 'expected_url', 'reason'}
+    if (not isinstance(payload, dict) or set(payload) != required
+            or any(not isinstance(payload[key], str) for key in required)
+            or not 1 <= len(payload['expected_title'].strip()) <= 500
+            or not 1 <= len(payload['expected_url'].strip()) <= 2048
+            or not 1 <= len(payload['reason'].strip()) <= 1000):
+        raise ApiError('invalid_payload', 400)
+    with get_connection() as conn:
+        article = conn.execute('SELECT id, title, url FROM rss_items WHERE id = ?', (article_id,)).fetchone()
+        if article is None:
+            raise ApiError('article_not_found', 404)
+        if article['title'] != payload['expected_title'] or article['url'] != payload['expected_url']:
+            raise ApiError('article_version_conflict', 409)
+        post_count = conn.execute('SELECT COUNT(*) AS count FROM posts WHERE rss_item_id = ?', (article_id,)).fetchone()['count']
+    delete_rss_group(article_id)
+    add_log(None, 'INFO',
+            f'Agent {g.agent_id} deleted RSS article #{article_id}: {payload["reason"].strip()}')
+    return jsonify(ok=True, article_id=article_id, deleted=True, deleted_posts=post_count)
 
 
 @bp.get('/dashboard')

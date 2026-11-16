@@ -16,9 +16,9 @@ Configurar no ambiente privado do servidor apenas hashes SHA-256 hexadecimais de
 
 - `SUPERNOVA_AGENT_READ_TOKEN_SHA256`: leitura.
 - `SUPERNOVA_AGENT_CLASSIFY_TOKEN_SHA256`: leitura e PATCH de classificação.
-- `SUPERNOVA_AGENT_MANAGE_TOKEN_SHA256`: leitura, classificação, criação/edição de posts e publicação imediata.
+- `SUPERNOVA_AGENT_MANAGE_TOKEN_SHA256`: leitura, classificação, criação/edição de posts, publicação imediata e eliminação de artigos RSS.
 
-Valores vazios/desconhecidos: 401 JSON. Token de leitura a tentar PATCH: 403. O token de classificação não pode publicar. O token de gestão pode criar posts de texto como rascunho/agendados, editar posts ainda não publicados e pedir publicação imediata em plataformas com publisher implementado. A edição da API altera o registo no Supernova; não altera uma publicação já feita na rede. Nenhum token de agente permite apagar posts, gerir integrações ou criar utilizadores. As sessões humanas existentes conservam as suas próprias permissões.
+Valores vazios/desconhecidos: 401 JSON. Token de leitura a tentar escrever: 403. O token de classificação só altera classificações. O token de gestão pode criar posts de texto como rascunho/agendados, editar posts ainda não publicados, pedir publicação imediata em plataformas com publisher implementado e eliminar um artigo RSS por chamada. Apagar um artigo RSS remove o artigo e as versões de posts associadas do Supernova, mas não apaga cópias já publicadas nas redes. Não permite apagar posts sem artigo RSS, gerir integrações ou criar utilizadores. As sessões humanas existentes conservam as suas próprias permissões.
 
 Usar tokens distintos e aleatórios com pelo menos 32 bytes de entropia, guardar o token original num secret manager e fornecer ao processo agente por variável de ambiente. Não adicionar tokens ao repositório. Revogação/rotação: remover/substituir o hash no servidor. Existem três níveis de credencial; a auditoria identifica a credencial por uma impressão digital.
 
@@ -36,6 +36,7 @@ OpenAPI: `docs/agent-api.openapi.json`.
 | POST `/api/posts` | Criar post de texto como rascunho ou agendado; requer token de gestão e `client_request_id` |
 | PATCH `/api/posts/{id}` | Editar título, copy, hashtags e agendamento de post não publicado; requer versão e `client_request_id` |
 | POST `/api/posts/{id}/publish` | Publicação imediata explícita; requer versão, `reason` e `client_request_id` |
+| DELETE `/api/rss/articles/{id}` | Eliminar um artigo RSS e as versões associadas no Supernova; requer `expected_title`, `expected_url` e `reason` |
 | GET `/api/dashboard` | Contagens com unidades explícitas |
 | GET `/api/scheduled/posts` | Posts distintos que têm ocorrências pendentes |
 | GET `/api/scheduled/occurrences` | Ocorrências pendentes com identificador explícito |
@@ -62,6 +63,18 @@ O token de gestão pode criar posts sem media (rascunho por omissão ou agendado
 ```
 
 Editar só é permitido em posts Draft, Scheduled ou Failed; campos aceites: `title`, `copy`, `hashtags`, `scheduled_at`, mais `expected_version` e `client_request_id`. `scheduled_at` pode ser `null` para remover o agendamento. Publicar é uma operação externa e explícita, apenas para posts em Draft, Scheduled ou Failed e plataformas com publicação implementada. A operação muda temporariamente o estado para `Publishing`, usa o publisher existente e guarda um recibo idempotente; se o processo cair a meio, o mesmo pedido fica bloqueado em `publish_in_progress` para evitar duplicar uma publicação incerta. Posts que precisam de media não podem ser criados com media por esta API; edições de posts publicados nas redes também não são suportadas.
+
+Eliminar um artigo RSS requer o título e URL exactos lidos anteriormente; é uma chamada por artigo, sem eliminação em lote:
+
+```json
+{
+  "expected_title": "Título exacto do artigo",
+  "expected_url": "https://example.test/article",
+  "reason": "Motivo editorial da remoção"
+}
+```
+
+A resposta `deleted_posts` indica quantas versões internas foram removidas. Uma remoção só afecta dados do Supernova e os media associados; não remove publicações externas.
 
 PATCH obrigatório, sem campos adicionais:
 

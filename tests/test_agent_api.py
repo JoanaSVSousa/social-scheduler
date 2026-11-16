@@ -92,6 +92,28 @@ class AgentApiTests(unittest.TestCase):
             self.assertTrue(replay.json['already_applied'])
             self.assertEqual(publish.call_count, 1)
 
+    def test_manage_token_deletes_only_the_matching_rss_article_group(self):
+        with get_connection() as conn:
+            feed_id = conn.execute(
+                "INSERT INTO rss_feeds (name,url,target_platforms) VALUES ('delete-test','https://example.test/delete-feed','Bluesky')"
+            ).lastrowid
+            article_id = conn.execute(
+                "INSERT INTO rss_items (feed_id,item_guid,title,url) VALUES (?, 'delete-1', 'Expected title', 'https://example.test/article')",
+                (feed_id,),
+            ).lastrowid
+            conn.execute('UPDATE posts SET rss_item_id=? WHERE id=?', (article_id, self.post_id))
+        body = {'expected_title': 'Expected title', 'expected_url': 'https://example.test/article', 'reason': 'Duplicate article'}
+        forbidden = self.client.delete(f'/api/rss/articles/{article_id}', json=body, headers=self.headers)
+        self.assertEqual(forbidden.status_code, 403)
+        stale = self.client.delete(f'/api/rss/articles/{article_id}', json={**body, 'expected_title': 'Other title'}, headers=self.manage_headers)
+        self.assertEqual(stale.status_code, 409)
+        self.assertEqual(self.client.get(f'/api/posts/{self.post_id}', headers=self.manage_headers).status_code, 200)
+        deleted = self.client.delete(f'/api/rss/articles/{article_id}', json=body, headers=self.manage_headers)
+        self.assertEqual(deleted.status_code, 200)
+        self.assertEqual(deleted.json['deleted_posts'], 1)
+        self.assertEqual(self.client.get(f'/api/posts/{self.post_id}', headers=self.manage_headers).status_code, 404)
+        self.assertEqual(self.client.delete(f'/api/rss/articles/{article_id}', json=body, headers=self.manage_headers).status_code, 404)
+
     def test_listing_filters_links_pagination(self):
         with get_connection() as conn:
             feed = conn.execute("INSERT INTO rss_feeds (name,url,target_platforms) VALUES ('f','https://example.test/feed','Facebook')").lastrowid
@@ -180,6 +202,7 @@ class AgentApiTests(unittest.TestCase):
         rows = self.client.get('/api/scheduled/occurrences', headers=self.headers).json['occurrences']
         self.assertEqual(len({row['occurrence_id'] for row in rows}), 3)
         self.assertEqual(self.client.get('/api/version', headers=self.headers).json['api_version'], '1')
+        self.assertIn('delete_rss_articles', self.client.get('/api/version', headers=self.manage_headers).json['capabilities'])
 
     def test_browsing_cannot_reclassify_rss(self):
         with get_connection() as conn:
