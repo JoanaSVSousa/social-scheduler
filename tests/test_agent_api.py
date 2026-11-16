@@ -108,11 +108,11 @@ class AgentApiTests(unittest.TestCase):
         stale = self.client.delete(f'/api/rss/articles/{article_id}', json={**body, 'expected_title': 'Other title'}, headers=self.manage_headers)
         self.assertEqual(stale.status_code, 409)
         self.assertEqual(self.client.get(f'/api/posts/{self.post_id}', headers=self.manage_headers).status_code, 200)
-        deleted = self.client.delete(f'/api/rss/articles/{article_id}', json=body, headers=self.manage_headers)
+        deleted = self.client.post(f'/api/rss/articles/{article_id}/delete', json=body, headers=self.manage_headers)
         self.assertEqual(deleted.status_code, 200)
         self.assertEqual(deleted.json['deleted_posts'], 1)
         self.assertEqual(self.client.get(f'/api/posts/{self.post_id}', headers=self.manage_headers).status_code, 404)
-        self.assertEqual(self.client.delete(f'/api/rss/articles/{article_id}', json=body, headers=self.manage_headers).status_code, 404)
+        self.assertEqual(self.client.post(f'/api/rss/articles/{article_id}/delete', json=body, headers=self.manage_headers).status_code, 404)
 
     def test_listing_filters_links_pagination(self):
         with get_connection() as conn:

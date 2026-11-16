@@ -36,7 +36,7 @@ OpenAPI: `docs/agent-api.openapi.json`.
 | POST `/api/posts` | Criar post de texto como rascunho ou agendado; requer token de gestão e `client_request_id` |
 | PATCH `/api/posts/{id}` | Editar título, copy, hashtags e agendamento de post não publicado; requer versão e `client_request_id` |
 | POST `/api/posts/{id}/publish` | Publicação imediata explícita; requer versão, `reason` e `client_request_id` |
-| DELETE `/api/rss/articles/{id}` | Eliminar um artigo RSS e as versões associadas no Supernova; requer `expected_title`, `expected_url` e `reason` |
+| POST `/api/rss/articles/{id}/delete` (ou DELETE `/api/rss/articles/{id}`) | Eliminar um artigo RSS e as versões associadas no Supernova; requer `expected_title`, `expected_url` e `reason` |
 | GET `/api/dashboard` | Contagens com unidades explícitas |
 | GET `/api/scheduled/posts` | Posts distintos que têm ocorrências pendentes |
 | GET `/api/scheduled/occurrences` | Ocorrências pendentes com identificador explícito |
@@ -119,6 +119,7 @@ python3 scripts/supernova_agent.py --base-url http://127.0.0.1:5000 classify 123
 python3 scripts/supernova_agent.py --base-url http://127.0.0.1:5000 create --title 'Título interno' --copy 'Texto' --platform Bluesky --request-id '<UUID>'
 python3 scripts/supernova_agent.py --base-url http://127.0.0.1:5000 edit 123 --copy 'Texto revisto' --expected-version '<version>' --request-id '<UUID>'
 python3 scripts/supernova_agent.py --base-url http://127.0.0.1:5000 publish 123 --expected-version '<version>' --reason 'Aprovado' --request-id '<UUID>'
+python3 scripts/supernova_agent.py --base-url http://127.0.0.1:5000 delete-article 123 --expected-title 'Título exacto' --expected-url 'https://example.test/article' --reason 'Duplicado'
 ```
 
 O CLI envia PATCH e depois GET verify para classificações; gestão usa `client_request_id`, versão esperada e recibos para repetição segura. Não resolve conflitos silenciosamente. A API não disponibiliza upload de media: criar posts de formatos que exigem media é rejeitado. Sem MCP nesta fase: API + CLI são suficientes para integração sem browser.

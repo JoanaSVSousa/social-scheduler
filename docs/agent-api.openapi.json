@@ -1000,6 +1000,48 @@
           }
         }
       }
+    },
+    "/api/rss/articles/{article_id}/delete": {
+      "post": {
+        "summary": "Delete one RSS article and its Supernova network versions (management token)",
+        "parameters": [
+          {
+            "name": "article_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteArticleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Deleted from Supernova"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "403": {
+            "description": "Management capability required"
+          },
+          "404": {
+            "description": "Article not found"
+          },
+          "409": {
+            "description": "Expected title or URL did not match"
+          }
+        }
+      }
     }
   },
   "components": {

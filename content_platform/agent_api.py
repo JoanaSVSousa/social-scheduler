@@ -457,6 +457,7 @@ def publish_agent_post(post_id):
 
 
 @bp.delete('/rss/articles/<int:article_id>')
+@bp.post('/rss/articles/<int:article_id>/delete')
 def delete_agent_rss_article(article_id):
     _require_manage()
     payload = request.get_json(silent=True)

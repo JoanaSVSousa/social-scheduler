@@ -110,7 +110,7 @@ def main():
         elif args.command == 'delete-article':
             payload = {'expected_title': args.expected_title, 'expected_url': args.expected_url,
                        'reason': args.reason}
-            result = request_json(args.base_url, token, f'/api/rss/articles/{args.article_id}', payload, method='DELETE')
+            result = request_json(args.base_url, token, f'/api/rss/articles/{args.article_id}/delete', payload, method='POST')
         else:
             result = call('/api/' + ('scheduled/occurrences' if args.command == 'scheduled' else args.command))
         print(json.dumps(result, ensure_ascii=False, indent=2))
