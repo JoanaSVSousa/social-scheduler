@@ -31,6 +31,7 @@ from .services.clock import app_now
 from .services.scheduled_view import list_scheduled_occurrences
 from .services.media import delete_media, get_media_for_post, get_media_for_posts, save_media_files
 from .services.publisher import process_publication_queue, publish_post_now, publish_rss_group_now
+from .services.platform_publishers import verify_bluesky_account, verify_x_account
 from .services.reporting import send_daily_publication_report
 from .services.rich_text import compose_publication_text
 from .services.rss import (
@@ -1041,9 +1042,11 @@ def verify_social_account_settings(platform):
     try:
         message = _verify_social_account(account)
     except RuntimeError as exc:
+        update_social_account_credentials(platform, {}, STATUS_NEEDS_VERIFICATION)
         add_log(None, "ERROR", f"{platform} credential verification failed: {exc}")
         flash(f"{platform} verification failed: {exc}", "warning")
     else:
+        update_social_account_credentials(platform, {}, STATUS_CONNECTED)
         add_log(None, "SUCCESS", f"{platform} credential verification passed: {message}")
         flash(f"{platform} verification passed: {message}", "success")
     return redirect(url_for("main.social_account_settings"))
@@ -1337,7 +1340,11 @@ def _verify_social_account(account):
         return _verify_instagram_account(credentials)
     if platform == "Threads":
         return _verify_threads_account(credentials)
-    raise RuntimeError("Credential verification is currently available for Facebook, Instagram, and Threads.")
+    if platform == "X":
+        return verify_x_account(account)
+    if platform == "Bluesky":
+        return verify_bluesky_account(account)
+    raise RuntimeError("Credential verification is currently available for Facebook, Instagram, Threads, X, and Bluesky.")
 
 
 def _verify_facebook_account(credentials):

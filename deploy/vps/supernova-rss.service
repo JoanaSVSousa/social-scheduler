@@ -1,0 +1,18 @@
+[Unit]
+Description=Check Supernova RSS feeds
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=supernova-publisher
+Group=supernova-publisher
+PrivateTmp=yes
+WorkingDirectory=/opt/Supernova
+EnvironmentFile=/opt/Supernova/publisher.env
+Environment=APP_BASE_URL=https://supernova.169-58-217-1.sslip.io
+Environment=PYTHONUNBUFFERED=1
+ExecStartPre=/bin/sh -ec 'test -n "$$DATABASE_URL" && test -n "$$SECRET_KEY" && test -n "$$ADMIN_USERNAME" && test -n "$$ADMIN_PASSWORD" && test -n "$$CREDENTIALS_ENCRYPTION_KEY" && test -n "$$SUPABASE_URL" && test -n "$$SUPABASE_SERVICE_ROLE_KEY"'
+ExecStart=/opt/Supernova/.venv/bin/python scripts/check_rss_feeds.py
+UMask=0077
+NoNewPrivileges=yes

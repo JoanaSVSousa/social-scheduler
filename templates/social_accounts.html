@@ -105,7 +105,7 @@
                 <button class="button primary" type="submit">Connect Threads</button>
             </form>
             {% endif %}
-            {% if platform in ["Facebook", "Instagram", "Threads"] and account %}
+            {% if platform in ["Facebook", "Instagram", "Threads", "X", "Bluesky"] and account %}
             <form method="post" action="{{ url_for('main.verify_social_account_settings', platform=platform) }}" class="social-account-form">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <p class="field-help">
@@ -113,6 +113,10 @@
                     Checks whether the Facebook Page token can read the linked Instagram account before publishing.
                     {% elif platform == "Threads" %}
                     Checks whether the saved Threads user token can read this Threads account before publishing.
+                    {% elif platform == "X" %}
+                    Checks the authenticated X profile and configured handle without posting. This read-only check does not verify write access or API product limits.
+                    {% elif platform == "Bluesky" %}
+                    Authenticates with the saved app password and checks the configured handle. No post is created.
                     {% else %}
                     Checks whether the saved Page token can read this Facebook Page before publishing.
                     {% endif %}

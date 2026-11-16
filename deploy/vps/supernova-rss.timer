@@ -1,0 +1,11 @@
+[Unit]
+Description=Check Supernova RSS feeds every two hours
+
+[Timer]
+OnCalendar=*-*-* 00/2:17:00
+AccuracySec=1min
+Persistent=true
+Unit=supernova-rss.service
+
+[Install]
+WantedBy=timers.target

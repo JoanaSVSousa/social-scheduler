@@ -41,6 +41,82 @@ def is_platform_publishable(platform):
     return platform in IMPLEMENTED_PUBLISHERS
 
 
+def verify_x_account(account):
+    """Read the authenticated X profile without creating a post."""
+    credentials = account.get("credentials", {})
+    auth_type = account.get("auth_type") or "oauth1"
+    endpoint = "https://api.x.com/2/users/me"
+
+    if auth_type == "oauth1":
+        authorization = _x_oauth1_header("GET", endpoint, credentials)
+        if not authorization:
+            raise RuntimeError("X OAuth1 verification needs API Key, API Key Secret, Access Token, and Access Token Secret.")
+    elif auth_type == "oauth2":
+        token = credentials.get("oauth2_user_token", "")
+        if not token:
+            raise RuntimeError("X OAuth2 verification needs a user-context access token with users.read.")
+        authorization = f"Bearer {token}"
+    else:
+        raise RuntimeError(f"Unsupported X authentication type: {auth_type}.")
+
+    request = Request(endpoint, headers={"Authorization": authorization}, method="GET")
+    try:
+        profile = _request_json(request, "authenticated user lookup", "X API")
+    except PublicationError as exc:
+        raise RuntimeError(str(exc)) from exc
+
+    user = profile.get("data") or {}
+    username = str(user.get("username") or "").strip().lstrip("@")
+    if not user.get("id") or not username:
+        raise RuntimeError("X returned no authenticated user profile.")
+
+    expected_handle = str(account.get("account_handle") or "").strip().lstrip("@").lower()
+    if expected_handle and username.lower() != expected_handle:
+        raise RuntimeError(
+            f"The X token belongs to @{username}, not the configured account @{expected_handle}."
+        )
+    return f"X account @{username} is readable and matches the configured handle. Read-only check; write access was not tested."
+
+
+def verify_bluesky_account(account):
+    """Authenticate with the app password and match the account handle; never writes a post."""
+    credentials = account.get("credentials", {})
+    identifier = credentials.get("identifier") or account.get("account_handle", "")
+    app_password = credentials.get("app_password", "")
+    if not identifier or not app_password:
+        raise RuntimeError("Bluesky verification needs a handle/email and an app password.")
+
+    try:
+        pds_url = _normalize_bluesky_pds_url(credentials.get("pds_url"))
+    except PublicationError as exc:
+        raise RuntimeError(str(exc)) from exc
+
+    try:
+        session = _post_json(
+            f"{pds_url}/xrpc/com.atproto.server.createSession",
+            {"identifier": identifier, "password": app_password},
+            endpoint_name="account verification",
+            error_label="Bluesky API",
+        )
+    except PublicationError as exc:
+        raise RuntimeError(str(exc)) from exc
+
+    actual_handle = str(session.get("handle") or "").strip().lstrip("@").lower()
+    if not actual_handle or not session.get("did") or not session.get("accessJwt"):
+        raise RuntimeError("Bluesky did not return an authenticated account session.")
+
+    configured_handle = str(account.get("account_handle") or "").strip().lstrip("@").lower()
+    handle_matches = (
+        configured_handle == actual_handle
+        or ("." not in configured_handle and actual_handle.split(".", 1)[0] == configured_handle)
+    )
+    if configured_handle and not handle_matches:
+        raise RuntimeError(
+            f"The Bluesky app password belongs to @{actual_handle}, not the configured account @{configured_handle}."
+        )
+    return f"Bluesky account @{actual_handle} authenticated successfully. No post was created."
+
+
 def publish_to_platform(post, media_items):
     if post["platform"] == "Bluesky":
         return publish_to_bluesky(post, media_items)
